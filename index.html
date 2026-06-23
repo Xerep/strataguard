@@ -542,81 +542,39 @@ footer{background:var(--navy);color:#9FD3E8;padding:9px 28px;font-size:7.5px;dis
 
 <script>
 // ── SUPABASE AUTH ────────────────────────────────────────────────────
+// SECURITY: Credentials injected at deploy time — never hardcode here.
+// GitHub Pages: use a GitHub Actions build step:
+//   sed -i "s|__SUPABASE_URL__|$SUPABASE_URL|g" index.html
+//   sed -i "s|__SUPABASE_KEY__|$SUPABASE_ANON_KEY|g" index.html
+// Store secrets in: GitHub repo -> Settings -> Secrets and variables -> Actions
 const { createClient } = supabase;
 const _sb = createClient(
-  'https://aspnjdmtfcezomvxcybk.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzcG5qZG10ZmNlem9tdnhjeWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2Mzc4MTEsImV4cCI6MjA5NzIxMzgxMX0.XElNTEJz7hc4H54YssQ0NvgNC7VifPSpT6Qlfi51JGs'
+  '__SUPABASE_URL__',
+  '__SUPABASE_KEY__'
 );
 
-// ── SECURE API HELPER — all data calls go through Netlify function ────
-// Supabase URL and key never exposed in data queries
-let _authToken = null;
-
+// ── DATA API HELPER — direct Supabase queries (GitHub Pages deployment) ────
 async function api(action, params = {}) {
-  // Direct Supabase queries — no backend function needed
-  if (action === 'getLatest') {
+  const table = params.table;
+  if (action === 'getDates') {
     const { data, error } = await _sb
-      .from(params.table)
-      .select('*')
-      .order('run_timestamp', { ascending: false })
-      .limit(1);
-    if (error) throw error;
-    return data;
-
-  } else if (action === 'getTrend') {
-    const { data, error } = await _sb
-      .from(params.table)
-      .select('run_date,composite_score,composite_level')
-      .order('run_date', { ascending: true })
-      .limit(7);
-    if (error) throw error;
-    return data;
-
-  } else if (action === 'getDates') {
-    const { data, error } = await _sb
-      .from(params.table)
+      .from(table)
       .select('run_date')
       .order('run_date', { ascending: false })
       .limit(365);
     if (error) throw error;
     return data;
-
-  } else if (action === 'getByDate') {
+  }
+  if (action === 'getByDate') {
     const { data, error } = await _sb
-      .from(params.table)
+      .from(table)
       .select('*')
       .eq('run_date', params.date)
-      .single();
+      .order('run_timestamp', { ascending: false })
+      .limit(1);
     if (error) throw error;
-    return data;
-
-  } else if (action === 'getUserMPAs') {
-    const uid = currentUser?.id;
-    if (!uid) return [];
-    const { data: accessRows, error: e1 } = await _sb
-      .from('user_mpa_access')
-      .select('mpa_id, plan, expires_at')
-      .eq('user_id', uid)
-      .eq('active', true);
-    if (e1) throw e1;
-
-    const ids = (accessRows || []).map(r => r.mpa_id);
-    const { data: regRows } = await _sb
-      .from('mpa_registry')
-      .select('id, name')
-      .in('id', ids);
-
-    const nameMap = {};
-    (regRows || []).forEach(r => { nameMap[r.id] = r.name; });
-
-    return (accessRows || []).map(a => ({
-      mpa_id: a.mpa_id,
-      plan: a.plan,
-      expires_at: a.expires_at,
-      mpa_registry: { name: nameMap[a.mpa_id] || a.mpa_id }
-    }));
+    return data?.[0] || null;
   }
-
   throw new Error('Unknown action: ' + action);
 }
 
@@ -1162,7 +1120,7 @@ let mapMarkers = {};
 function lc(l){return l==='CRITICAL'?'critical':l==='HIGH'?'high':l==='ELEVATED'?'elevated':l==='MODERATE'?'moderate':l==='LOW'?'low':'minimal';}
 function lcolor(l){return l==='CRITICAL'?'var(--red)':l==='HIGH'?'var(--orange)':l==='ELEVATED'?'var(--orange)':l==='MODERATE'?'var(--gold)':l==='LOW'?'var(--green)':'var(--slate)';}
 function threatPts(f){return f.type==='D'?(100-f.rawScore):f.rawScore;}
-function contrib(f){return Math.round(threatPts(f)*f.weight*10)/10;}
+// Note: contrib() removed — factor weights are not exposed client-side
 
 function buildLiveZones(r) {
   const alerts = JSON.parse(typeof r.force_multipliers==='string'?r.force_multipliers:'[]').filter((v,i,a)=>a.indexOf(v)===i);
@@ -1253,20 +1211,20 @@ function buildLiveZones(r) {
       sst:{celsius:sst,fahrenheit:Math.round((sst*9/5+32)*10)/10,fish_concentration_score:Math.min(99,Math.max(5,Math.round((sst-24)/8*60+40)))},
       currents:{speed_knots:kts,direction_compass:ck.dir||'N/A',risk:ctLabel[cType]||'MIXED',live:r.current_source_tier==='live'},
       factors:[
-        {name:'Darkness Window',    type:'E',weight:0.12,rawScore:75,              val:`${darkHours}h dark`},
-        {name:'Twilight Window',    type:'E',weight:0.06,rawScore:65,              val:`Dusk ${r.civil_dusk_local||'—'}`},
-        {name:'Wind Speed',         type:'D',weight:0.14,rawScore:windScore,       val:`${wind}mph / ${r.wind_direction||'SE'}`},
-        {name:'Rain & Thunderstorm',type:'D',weight:0.10,rawScore:Math.round(Math.min(99,(r.precip_prob_max_pct||0)/70*80)), val:`${r.precip_prob_max_pct||0}% / ${r.thunderstorm_hours||0}h`},
-        {name:'Marine Visibility',  type:'E',weight:0.12,rawScore:visScore,        val:`${vis}mi min`},
-        {name:'Wave Height',        type:'D',weight:0.10,rawScore:waveScore,       val:`${wave}m max`},
-        {name:'Tidal Window',       type:'M',weight:0.10,rawScore:35,              val:`High 0.35m / Low -0.05m MLLW`},
-        {name:'Ocean Current',      type:cType,weight:0.10,rawScore:cScore,        val:`${kts}kts ${ck.dir||'N/A'} ●${r.current_source_tier==='live'?'live':'est'}`},
-        {name:'Sea Surface Temp',   type:'E',weight:0.08,rawScore:sstScore,        val:`${sst}°C / ${Math.round((sst*9/5+32)*10)/10}°F`},
-        {name:'Night Wind Calm',    type:'E',weight:0.08,rawScore:nightWindScore,  val:`${wind}mph night`},
-        {name:'Cloud Cover',        type:'E',weight:0.06,rawScore:cloudScore,      val:`${cloudMap[zid]}%`},
-        {name:'Pressure Trend',     type:'D',weight:0.05,rawScore:ptScore,         val:`${pressMap[zid]} hPa`},
-        {name:'Moon Illumination',  type:'E',weight:0.08,rawScore:moonScore,       val:`${moon}% (${r.moon_phase||'—'})`},
-        {name:'Regulatory Vuln.',   type:'E',weight:0.10,rawScore:r.regulatory_active?80:15, val:r.regulatory_active?r.regulatory_species:'None'},
+        {name:'Darkness Window',    type:'E',rawScore:75,              val:`${darkHours}h dark`},
+        {name:'Twilight Window',    type:'E',rawScore:65,              val:`Dusk ${r.civil_dusk_local||'—'}`},
+        {name:'Wind Speed',         type:'D',rawScore:windScore,       val:`${wind}mph / ${r.wind_direction||'SE'}`},
+        {name:'Rain & Thunderstorm',type:'D',rawScore:Math.round(Math.min(99,(r.precip_prob_max_pct||0)/70*80)), val:`${r.precip_prob_max_pct||0}% / ${r.thunderstorm_hours||0}h`},
+        {name:'Marine Visibility',  type:'E',rawScore:visScore,        val:`${vis}mi min`},
+        {name:'Wave Height',        type:'D',rawScore:waveScore,       val:`${wave}m max`},
+        {name:'Tidal Window',       type:'M',rawScore:35,              val:`High 0.35m / Low -0.05m MLLW`},
+        {name:'Ocean Current',      type:cType,rawScore:cScore,        val:`${kts}kts ${ck.dir||'N/A'} ●${r.current_source_tier==='live'?'live':'est'}`},
+        {name:'Sea Surface Temp',   type:'E',rawScore:sstScore,        val:`${sst}°C / ${Math.round((sst*9/5+32)*10)/10}°F`},
+        {name:'Night Wind Calm',    type:'E',rawScore:nightWindScore,  val:`${wind}mph night`},
+        {name:'Cloud Cover',        type:'E',rawScore:cloudScore,      val:`${cloudMap[zid]}%`},
+        {name:'Pressure Trend',     type:'D',rawScore:ptScore,         val:`${pressMap[zid]} hPa`},
+        {name:'Moon Illumination',  type:'E',rawScore:moonScore,       val:`${moon}% (${r.moon_phase||'—'})`},
+        {name:'Regulatory Vuln.',   type:'E',rawScore:r.regulatory_active?80:15, val:r.regulatory_active?r.regulatory_species:'None'},
       ]
     };
   });
@@ -1373,7 +1331,7 @@ function updateFM(z){
 
 function updateDrivers(z){
   document.getElementById('intel-note').innerHTML=`<strong>Zone Intel:</strong> ${z.note}`;
-  const riskF=z.factors.filter(f=>f.type==='E'||f.type==='M').sort((a,b)=>contrib(b)-contrib(a)).slice(0,3);
+  const riskF=z.factors.filter(f=>f.type==='E'||f.type==='M').sort((a,b)=>threatPts(b)-threatPts(a)).slice(0,3);
   const detF=z.factors.filter(f=>f.type==='D').sort((a,b)=>b.rawScore-a.rawScore).slice(0,3);
   document.getElementById('risk-drivers').innerHTML=riskF.map((f,i)=>`
     <div class="driver-item"><div class="driver-rank re">${i+1}</div><div class="driver-name">${f.name}</div><div class="driver-val">${f.val}</div><span class="dbadge be">ELEVATED</span></div>`).join('');
