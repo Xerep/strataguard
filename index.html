@@ -535,7 +535,7 @@ footer{background:var(--navy);color:#9FD3E8;padding:9px 28px;font-size:7.5px;dis
   </div>
   <div style="text-align:right;">
     <div style="color:var(--gold2);font-size:7.5px;font-style:italic;margin-bottom:1px;">"Math Reacts to Reality" · StrataGuard Intelligence™</div>
-    <div style="color:#4A6A7A;font-size:7px;">StrataGuard Intelligence · All data 100% public domain · v9.0</div>
+    <div style="color:#4A6A7A;font-size:7px;">StrataGuard Intelligence · All data 100% public domain · v9.1</div>
   </div>
 </footer>
 </div><!-- end dashboard-content -->
@@ -545,12 +545,12 @@ footer{background:var(--navy);color:#9FD3E8;padding:9px 28px;font-size:7.5px;dis
 // SECURITY: Credentials injected at deploy time — never hardcode here.
 // GitHub Pages: use a GitHub Actions build step:
 //   sed -i "s|https://aspnjdmtfcezomvxcybk.supabase.co|$SUPABASE_URL|g" index.html
-//   sed -i "s|eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzcG5qZG10ZmNlem9tdnhjeWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2Mzc4MTEsImV4cCI6MjA5NzIxMzgxMX0.XElNTEJz7hc4H54YssQ0NvgNC7VifPSpT6Qlfi51JGs|$SUPABASE_ANON_KEY|g" index.html
+//   sed -i "s|sb_publishable_NXV3YLdja-E_v_Sb83mDjA_z2GWp2Iy|$SUPABASE_ANON_KEY|g" index.html
 // Store secrets in: GitHub repo -> Settings -> Secrets and variables -> Actions
 const { createClient } = supabase;
 const _sb = createClient(
   'https://aspnjdmtfcezomvxcybk.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzcG5qZG10ZmNlem9tdnhjeWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2Mzc4MTEsImV4cCI6MjA5NzIxMzgxMX0.XElNTEJz7hc4H54YssQ0NvgNC7VifPSpT6Qlfi51JGs'
+  'sb_publishable_NXV3YLdja-E_v_Sb83mDjA_z2GWp2Iy'
 );
 
 // ── DATA API HELPER — direct Supabase queries (GitHub Pages deployment) ────
