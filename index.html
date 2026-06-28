@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>StrataGuard — Marine Intelligence Platform</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.49.0/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
@@ -486,7 +486,7 @@ footer{background:var(--navy);color:#9FD3E8;padding:9px 28px;font-size:7.5px;dis
         <div id="map"></div>
         <div class="map-overlay">
           <strong style="color:var(--gold2);" id="map-mpa-label">Cay Sal Bank</strong><br>
-          23.9°N · 80.4°W · 4 Active Zones<br>
+          <span id="map-coords">23.9°N · 80.4°W</span> · <span id="map-active-zones">4</span> Active Zones<br>
           <span style="color:#6A8A9A;">Click marker for zone detail</span>
         </div>
       </div>
@@ -535,7 +535,7 @@ footer{background:var(--navy);color:#9FD3E8;padding:9px 28px;font-size:7.5px;dis
   </div>
   <div style="text-align:right;">
     <div style="color:var(--gold2);font-size:7.5px;font-style:italic;margin-bottom:1px;">"Math Reacts to Reality" · StrataGuard Intelligence™</div>
-    <div style="color:#4A6A7A;font-size:7px;">StrataGuard Intelligence · All data 100% public domain · v9.2</div>
+    <div style="color:#4A6A7A;font-size:7px;">StrataGuard Intelligence · All data 100% public domain · v9.0</div>
   </div>
 </footer>
 </div><!-- end dashboard-content -->
@@ -719,6 +719,9 @@ function selectMPA(mpa) {
   const mapTitle = document.getElementById('map-zone-count-title');
   if(mapTitle) mapTitle.textContent = zCount+'-Zone Coverage Map';
   document.getElementById('map-mpa-label').textContent = mpa.mpa_name;
+  const mapCoords = mpa.mpa_id==='andros' ? '24.3°N · 78.0°W' : '23.9°N · 80.4°W';
+  document.getElementById('map-coords').textContent = mapCoords;
+  document.getElementById('map-active-zones').textContent = zCount;
 
   // Expiry warning
   if (mpa.days_remaining <= 7 && mpa.days_remaining < 9999) {
@@ -1105,8 +1108,8 @@ const MPA_ZONE_DEFS = {
   ],
   'andros': [
     {id:'joulter_cays',    name:'Joulter Cays',                  label:'North Entry — Dominican Corridor',   approach:'Northern open bank approach',   note:'Primary northern entry point. Dominican fleet approach corridor.', coords:[25.27,-78.12]},
-    {id:'red_bays_flat',   name:'Red Bays Flat',                 label:'NW — Highest Lobster Density',       approach:'Northwest flat approach',        note:'Highest lobster density flat in West Andros. Known commercial poaching ground.', coords:[24.73,-78.05]},
-    {id:'north_bight',     name:'North Bight Entry',             label:'Central — Nassau Corridor',          approach:'Central Nassau / local access',  note:'Primary central access corridor. Nassau-based and local vessels.', coords:[24.50,-77.98]},
+    {id:'red_bays_flat',   name:'Red Bays Flat',                 label:'NW — Highest Lobster Density',       approach:'Northwest flat approach',        note:'Highest lobster density flat in West Andros. Known commercial poaching ground.', coords:[24.73,-78.50]},
+    {id:'north_bight',     name:'North Bight Entry',             label:'Central — Nassau Corridor',          approach:'Central Nassau / local access',  note:'Primary central access corridor. Nassau-based and local vessels.', coords:[24.50,-78.40]},
     {id:'middle_bight',    name:'Middle Bight — Land of Giants', label:'Central — Peak Fish Concentration',  approach:'Central atoll / bight access',   note:'Known as Land of the Giants. Highest fish concentration in all of Andros.', coords:[24.18,-77.95]},
     {id:'curley_cut_cays', name:'Curley Cut Cays',               label:'SW — Remote Southern Approach',      approach:'Southwest remote corridor',      note:'Most remote southwest sector. Minimal patrol coverage.', coords:[23.73,-77.80]},
     {id:'mars_bay',        name:'Mars Bay',                      label:'South — Zero Patrol Coverage',       approach:'Southern tip — open bank',       note:'Southernmost tip of Andros. Zero patrol infrastructure.', coords:[23.50,-77.75]},
@@ -1437,7 +1440,7 @@ function markerHTML(z,active){
 function updateMapMarkers(){
   if(!window._map) return;
   const mpaId = currentMPA?.mpa_id || 'cay_sal_bank';
-  const center = mpaId==='andros' ? [24.40,-78.00] : [23.75,-80.05];
+  const center = mpaId==='andros' ? [24.28,-78.10] : [23.75,-80.05];
   window._map.setView(center, 7);
 
   // Remove all existing markers
@@ -1487,7 +1490,7 @@ function initMap(){
 
     // Set view AFTER tiles added — center depends on MPA
     const _mpaId = currentMPA?.mpa_id || 'cay_sal_bank';
-    const _center = _mpaId==='andros' ? [24.40,-78.00] : [23.75,-80.05];
+    const _center = _mpaId==='andros' ? [24.28,-78.10] : [23.75,-80.05];
     map.setView(_center, 7);
     map.invalidateSize(true);
 
