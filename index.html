@@ -1437,8 +1437,8 @@ function markerHTML(z,active){
 function updateMapMarkers(){
   if(!window._map) return;
   const mpaId = currentMPA?.mpa_id || 'cay_sal_bank';
-  const center = mpaId==='andros' ? [24.28,-78.10] : [23.75,-80.05];
-  window._map.setView(center, 8);
+  const center = mpaId==='andros' ? [24.40,-78.00] : [23.75,-80.05];
+  window._map.setView(center, 7);
 
   // Remove all existing markers
   Object.values(mapMarkers).forEach(m => { try { window._map.removeLayer(m); } catch(e){} });
@@ -1487,8 +1487,8 @@ function initMap(){
 
     // Set view AFTER tiles added — center depends on MPA
     const _mpaId = currentMPA?.mpa_id || 'cay_sal_bank';
-    const _center = _mpaId==='andros' ? [24.28,-78.10] : [23.75,-80.05];
-    map.setView(_center, 8);
+    const _center = _mpaId==='andros' ? [24.40,-78.00] : [23.75,-80.05];
+    map.setView(_center, 7);
     map.invalidateSize(true);
 
   }catch(e){
