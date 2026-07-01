@@ -1493,19 +1493,22 @@ function initMap(){
     // ── CONFIRMED RBDF INCIDENT OVERLAY ──────────────────────────────
     // Source: RBDF press releases 2016-2021 — confirmed interdictions only
     // These are documented facts, not estimates
-    const RBDF_INCIDENTS = [
-      { lat:23.95, lon:-80.45, date:'Nov 2016',    crew:50,  label:'2 Dominican vessels — 12-foot seas — rammed HMBS Madeira' },
-      { lat:23.75, lon:-80.05, date:'Jun 16 2018', crew:4,   label:'Brailyn (50ft) — Great Bahama Bank — lobster closed' },
-      { lat:23.95, lon:-80.45, date:'Jul 8 2018',  crew:46,  label:'Ronnye (70ft) — East Cay Lobos — 33,000 lbs seized — armed' },
-      { lat:23.95, lon:-80.45, date:'Oct 13 2018', crew:124, label:'Paul / Chicky / Digna Rosa — 3 motherships — opened fire on RBDF' },
-      { lat:21.50, lon:-73.00, date:'Nov 11 2018', crew:7,   label:'2 go-fast boats — Little Inagua — noon daytime' },
-      { lat:21.00, lon:-73.50, date:'Dec 1 2018',  crew:7,   label:'7 Dominicans — Off Inagua — grouper closed season day 1' },
-      { lat:21.00, lon:-73.50, date:'Dec 17 2018', crew:7,   label:'2 go-fast boats — Off Inagua — compressors seized' },
-      { lat:20.80, lon:-73.20, date:'Dec 21 2018', crew:4,   label:'Go-fast vessel — SE Great Inagua — OPBAT helicopter detection' },
-      { lat:23.00, lon:-79.50, date:'Nov 13 2019', crew:17,  label:'Cascarilla (76ft) — Cochinos Banks — 12:24 AM' },
-      { lat:23.50, lon:-77.75, date:'Sep 17 2020', crew:81,  label:'El Ship + Angel Gabriel — Diamond Point — 81 crew — new moon' },
-      { lat:23.50, lon:-77.75, date:'Sep 25 2021', crew:5,   label:'Amanda — Diamond Point — 20,000+ lbs seized — compressor + spearguns' },
+    // Incidents tagged by MPA — only show incidents relevant to current MPA view
+    // Cay Sal Bank: Old Bahama Channel, Cay Lobos, Great Bahama Bank, Cochinos Banks
+    // Andros: Diamond Point, Great Bahama Bank eastern edge
+    // Inagua: shown on neither current MPA — reserved for future Inagua MPA
+    const ALL_RBDF_INCIDENTS = [
+      { lat:23.90, lon:-80.30, mpa:'cay_sal_bank', date:'Nov 2016',    crew:50,  label:'2 Dominican vessels — Old Bahama Channel — 12-foot seas — rammed HMBS Madeira' },
+      { lat:23.72, lon:-80.10, mpa:'cay_sal_bank', date:'Jun 16 2018', crew:4,   label:'Brailyn (50ft) — Great Bahama Bank — lobster closed' },
+      { lat:23.92, lon:-80.38, mpa:'cay_sal_bank', date:'Jul 8 2018',  crew:46,  label:'Ronnye (70ft) — East Cay Lobos — 33,000 lbs seized — armed' },
+      { lat:23.95, lon:-80.42, mpa:'cay_sal_bank', date:'Oct 13 2018', crew:124, label:'Paul / Chicky / Digna Rosa — 3 motherships — Cay Lobos — opened fire on RBDF' },
+      { lat:23.05, lon:-79.52, mpa:'cay_sal_bank', date:'Nov 13 2019', crew:17,  label:'Cascarilla (76ft) — Cochinos Banks — 12:24 AM joint RBDF/USCG' },
+      { lat:23.52, lon:-77.78, mpa:'andros',        date:'Sep 17 2020', crew:81,  label:'El Ship + Angel Gabriel — Diamond Point — 81 crew — new moon' },
+      { lat:23.48, lon:-77.72, mpa:'andros',        date:'Sep 25 2021', crew:5,   label:'Amanda — Diamond Point — 20,000+ lbs — compressor + spearguns' },
     ];
+
+    const _currentMpaId = currentMPA?.mpa_id || 'cay_sal_bank';
+    const RBDF_INCIDENTS = ALL_RBDF_INCIDENTS.filter(inc => inc.mpa === _currentMpaId);
 
     RBDF_INCIDENTS.forEach(inc => {
       const size = inc.crew >= 50 ? 14 : inc.crew >= 15 ? 11 : 8;
