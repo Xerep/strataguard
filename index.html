@@ -486,7 +486,7 @@ footer{background:var(--navy);color:#9FD3E8;padding:9px 28px;font-size:7.5px;dis
         <div id="map"></div>
         <div class="map-overlay">
           <strong style="color:var(--gold2);" id="map-mpa-label">Cay Sal Bank</strong><br>
-          <span id="map-coords">23.9°N · 80.4°W</span> · <span id="map-active-zones">4</span> Active Zones<br>
+          23.9°N · 80.4°W · 4 Active Zones<br>
           <span style="color:#6A8A9A;">Click marker for zone detail</span>
         </div>
       </div>
@@ -526,16 +526,14 @@ footer{background:var(--navy);color:#9FD3E8;padding:9px 28px;font-size:7.5px;dis
 
 <footer>
   <div class="fsrc">
-    <div class="fsrc-item"><div class="fdot"></div>Atmospheric: Open-Meteo / ECMWF</div>
-    <div class="fsrc-item"><div class="fdot"></div>Oceanographic: NOAA Public Domain</div>
-    <div class="fsrc-item"><div class="fdot"></div>Marine: Open-Meteo Marine</div>
-    <div class="fsrc-item"><div class="fdot"></div>Astronomical: Public domain calculation</div>
-    <div class="fsrc-item"><div class="fdot"></div>Regulatory: Bahamas DMR</div>
-    <div class="fsrc-item"><div class="fdot"></div>Regulatory: Bahamas DMR</div>
+    <div class="fsrc-item"><div class="fdot"></div>Atmospheric: International meteorological agencies</div>
+    <div class="fsrc-item"><div class="fdot"></div>Oceanographic: International oceanographic agencies</div>
+    <div class="fsrc-item"><div class="fdot"></div>Hydrographic: International tidal agencies</div>
+    <div class="fsrc-item"><div class="fdot"></div>Regulatory: Bahamas Department of Marine Resources</div>
   </div>
   <div style="text-align:right;">
     <div style="color:var(--gold2);font-size:7.5px;font-style:italic;margin-bottom:1px;">"Math Reacts to Reality" · StrataGuard Intelligence™</div>
-    <div style="color:#4A6A7A;font-size:7px;">StrataGuard Intelligence · All data 100% public domain · v9.0</div>
+    <div style="color:#4A6A7A;font-size:7px;">StrataGuard Intelligence · Proprietary Methodology · v9.2</div>
   </div>
 </footer>
 </div><!-- end dashboard-content -->
@@ -719,9 +717,6 @@ function selectMPA(mpa) {
   const mapTitle = document.getElementById('map-zone-count-title');
   if(mapTitle) mapTitle.textContent = zCount+'-Zone Coverage Map';
   document.getElementById('map-mpa-label').textContent = mpa.mpa_name;
-  const mapCoords = mpa.mpa_id==='andros' ? '24.3°N · 78.0°W' : '23.9°N · 80.4°W';
-  document.getElementById('map-coords').textContent = mapCoords;
-  document.getElementById('map-active-zones').textContent = zCount;
 
   // Expiry warning
   if (mpa.days_remaining <= 7 && mpa.days_remaining < 9999) {
@@ -1043,7 +1038,7 @@ function updateRegulatory(r) {
   if (r.regulatory_active) {
     box.style.borderColor = '#FBCDC7';
     sp.textContent = r.regulatory_species || 'Closed Season Active';
-    det.textContent = 'Closed season active · Bahamas DMR · Black market demand elevated';
+    det.textContent = 'Closed season active · Enforcement window active · Black market demand elevated';
   } else {
     box.style.background = '#F0FFF4';
     box.style.borderColor = '#C0E8D0';
@@ -1441,7 +1436,7 @@ function updateMapMarkers(){
   if(!window._map) return;
   const mpaId = currentMPA?.mpa_id || 'cay_sal_bank';
   const center = mpaId==='andros' ? [24.28,-78.10] : [23.75,-80.05];
-  window._map.setView(center, 7);
+  window._map.setView(center, 8);
 
   // Remove all existing markers
   Object.values(mapMarkers).forEach(m => { try { window._map.removeLayer(m); } catch(e){} });
@@ -1491,7 +1486,7 @@ function initMap(){
     // Set view AFTER tiles added — center depends on MPA
     const _mpaId = currentMPA?.mpa_id || 'cay_sal_bank';
     const _center = _mpaId==='andros' ? [24.28,-78.10] : [23.75,-80.05];
-    map.setView(_center, 7);
+    map.setView(_center, 8);
     map.invalidateSize(true);
 
   }catch(e){
