@@ -493,7 +493,7 @@ footer{background:var(--navy);color:#9FD3E8;padding:9px 28px;font-size:7.5px;dis
         <div id="map"></div>
         <div class="map-overlay">
           <strong style="color:var(--gold2);" id="map-mpa-label">Cay Sal Bank</strong><br>
-          23.9°N · 80.4°W · 4 Active Zones<br>
+          <span id="map-mpa-coords">23.9°N · 80.4°W</span> · <span id="map-zone-count">4</span> Active Zones<br>
           <span style="color:#6A8A9A;">Click marker for zone detail</span>
         </div>
       </div>
@@ -585,15 +585,21 @@ async function api(action, params = {}) {
 
 // MPA routing (internal identifiers only)
 const MPA_TABLES = {
-  'cay_sal_bank': atob('Y2F5X3NhbF90aHJlYXRfbG9n'),
-  'exuma_cays':   atob('ZXh1bWFfdGhyZWF0X2xvZw=='),
-  'andros':       atob('YW5kcm9zX3RocmVhdF9sb2c=')
+  'cay_sal_bank':    atob('Y2F5X3NhbF90aHJlYXRfbG9n'),
+  'andros':          atob('YW5kcm9zX3RocmVhdF9sb2c='),
+  'great_inagua':    atob('Z3JlYXRfaW5hZ3VhX3RocmVhdF9sb2c='),
+  'diamond_point':   atob('ZGlhbW9uZF9wb2ludF90aHJlYXRfbG9n'),
+  'jumentos_cays':   atob('anVtZW50b3NfdGhyZWF0X2xvZw=='),
+  'exuma_cays':      atob('ZXh1bWFfdGhyZWF0X2xvZw=='),
 };
 
 const MPA_ICONS = {
-  'cay_sal_bank': '🐟',
-  'exuma_cays':   '🪸',
-  'andros':       '🌊'
+  'cay_sal_bank':  '🐟',
+  'andros':        '🌊',
+  'great_inagua':  '🦞',
+  'diamond_point': '💎',
+  'jumentos_cays': '⛵',
+  'exuma_cays':    '🪸',
 };
 
 let currentUser = null;
@@ -653,9 +659,12 @@ async function loadUserMPAs() {
       (regRows || []).forEach(r => { nameMap[r.id] = r.name; });
       // Friendly name overrides
       const friendlyNames = {
-        'cay_sal_bank': 'Cay Sal Bank',
-        'andros': 'Andros West Coast',
-        'exuma_cays': 'Exuma Cays Land & Sea Park'
+        'cay_sal_bank':  'Cay Sal Bank',
+        'andros':        'Andros West Coast',
+        'great_inagua':  'Great Inagua MPA',
+        'diamond_point': 'Diamond Point — Great Bahama Bank',
+        'jumentos_cays': 'Jumentos Cays',
+        'exuma_cays':    'Exuma Cays Land & Sea Park',
       };
 
       userMPAs = accessRows.map(a => ({
@@ -668,11 +677,25 @@ async function loadUserMPAs() {
           : 9999
       }));
     } else {
-      userMPAs = [{ mpa_id:'cay_sal_bank', mpa_name:'Cay Sal Bank', plan:'standard', expires_at:null, days_remaining:9999 }];
+      userMPAs = [
+        { mpa_id:'cay_sal_bank',  mpa_name:'Cay Sal Bank',                      plan:'standard', expires_at:null, days_remaining:9999 },
+        { mpa_id:'andros',        mpa_name:'Andros West Coast',                  plan:'standard', expires_at:null, days_remaining:9999 },
+        { mpa_id:'great_inagua',  mpa_name:'Great Inagua MPA',                   plan:'standard', expires_at:null, days_remaining:9999 },
+        { mpa_id:'diamond_point', mpa_name:'Diamond Point — Great Bahama Bank',  plan:'standard', expires_at:null, days_remaining:9999 },
+        { mpa_id:'jumentos_cays', mpa_name:'Jumentos Cays',                      plan:'standard', expires_at:null, days_remaining:9999 },
+        { mpa_id:'exuma_cays',    mpa_name:'Exuma Cays Land & Sea Park',         plan:'standard', expires_at:null, days_remaining:9999 },
+      ];
     }
   } catch(e) {
     console.error('loadUserMPAs error:', e);
-    userMPAs = [{ mpa_id:'cay_sal_bank', mpa_name:'Cay Sal Bank', plan:'standard', expires_at:null, days_remaining:9999 }];
+    userMPAs = [
+        { mpa_id:'cay_sal_bank',  mpa_name:'Cay Sal Bank',                      plan:'standard', expires_at:null, days_remaining:9999 },
+        { mpa_id:'andros',        mpa_name:'Andros West Coast',                  plan:'standard', expires_at:null, days_remaining:9999 },
+        { mpa_id:'great_inagua',  mpa_name:'Great Inagua MPA',                   plan:'standard', expires_at:null, days_remaining:9999 },
+        { mpa_id:'diamond_point', mpa_name:'Diamond Point — Great Bahama Bank',  plan:'standard', expires_at:null, days_remaining:9999 },
+        { mpa_id:'jumentos_cays', mpa_name:'Jumentos Cays',                      plan:'standard', expires_at:null, days_remaining:9999 },
+        { mpa_id:'exuma_cays',    mpa_name:'Exuma Cays Land & Sea Park',         plan:'standard', expires_at:null, days_remaining:9999 },
+      ];
   }
 
   if (userMPAs.length === 1) {
@@ -724,6 +747,18 @@ function selectMPA(mpa) {
   const mapTitle = document.getElementById('map-zone-count-title');
   if(mapTitle) mapTitle.textContent = zCount+'-Zone Coverage Map';
   document.getElementById('map-mpa-label').textContent = mpa.mpa_name;
+  const _coordsMap = {
+    'cay_sal_bank':  '23.9°N · 80.4°W',
+    'andros':        '24.3°N · 78.1°W',
+    'great_inagua':  '21.2°N · 73.2°W',
+    'diamond_point': '23.5°N · 77.8°W',
+    'jumentos_cays': '22.8°N · 75.5°W',
+    'exuma_cays':    '23.7°N · 76.3°W',
+  };
+  const _coordsEl = document.getElementById('map-mpa-coords');
+  if (_coordsEl) _coordsEl.textContent = _coordsMap[mpa.mpa_id] || '';
+  const _zcEl = document.getElementById('map-zone-count');
+  if (_zcEl) _zcEl.textContent = (MPA_ZONE_DEFS[mpa.mpa_id] || []).length;
 
   // Expiry warning
   if (mpa.days_remaining <= 7 && mpa.days_remaining < 9999) {
@@ -1115,6 +1150,25 @@ const MPA_ZONE_DEFS = {
     {id:'middle_bight',    name:'Middle Bight — Land of Giants', label:'Central — Peak Fish Concentration',  approach:'Central atoll / bight access',   note:'Known as Land of the Giants. Highest fish concentration in all of Andros.', coords:[24.18,-77.95]},
     {id:'curley_cut_cays', name:'Curley Cut Cays',               label:'SW — Remote Southern Approach',      approach:'Southwest remote corridor',      note:'Most remote southwest sector. Minimal patrol coverage.', coords:[23.73,-77.80]},
     {id:'mars_bay',        name:'Mars Bay',                      label:'South — Zero Patrol Coverage',       approach:'Southern tip — open bank',       note:'Southernmost tip of Andros. Zero patrol infrastructure.', coords:[23.50,-77.75]},
+  ],
+  'great_inagua': [
+    {id:'north_east_point',    name:'North East Point',    label:'NE — Primary Approach Corridor', approach:'Northeast open water approach',      note:'Most active documented poaching corridor for Inagua. P-128 caught 3 separate operations in 21 days Dec 2018.', coords:[21.55,-73.00]},
+    {id:'south_great_inagua',  name:'South Great Inagua', label:'South — Cuba Proximity Zone',    approach:'Southern open bank — Cuba channel',  note:'Closest point to Cuban waters. Primary Dominican/Cuban fleet approach. Extreme remoteness.', coords:[20.85,-73.35]},
+    {id:'little_inagua',       name:'Little Inagua',      label:'NW — Go-Fast Corridor',          approach:'Northwest small vessel approach',     note:'Documented go-fast boat operations Nov 2018. Noon daytime operation confirmed. No patrol coverage.', coords:[21.45,-73.05]},
+  ],
+  'diamond_point': [
+    {id:'diamond_point',  name:'Diamond Point',              label:'NW — Primary Interdiction Zone', approach:'Northwest Great Bahama Bank',       note:'El Ship/Angel Gabriel (81 crew) Sep 2020 and Amanda Sep 2021 both apprehended here. Highest confirmed incident density on GBB.', coords:[23.52,-77.78]},
+    {id:'southern_gbb',   name:'Southern Great Bahama Bank', label:'Central — Open Bank Corridor',   approach:'Central open bank approach',        note:'Dominican fleet transit corridor between Diamond Point and Cay Sal. Minimal patrol coverage.', coords:[23.30,-78.20]},
+  ],
+  'jumentos_cays': [
+    {id:'cay_santo_domingo', name:'Cay Santo Domingo',    label:'North — Confirmed Interdiction Zone', approach:'Northern Jumentos approach',       note:'Confirmed RBDF interdiction — 6 Dominicans on 3 skiffs. Primary entry point to Jumentos corridor from Dominican Republic.', coords:[23.10,-75.35]},
+    {id:'jumentos_north',    name:'Jumentos Cays North',  label:'Central — Transit Corridor',          approach:'Central chain transit',            note:'Unmonitored 100-mile chain of uninhabited cays. Primary Dominican fleet transit route toward Great Bahama Bank.', coords:[22.80,-75.50]},
+    {id:'jumentos_south',    name:'Jumentos Cays South',  label:'South — Ragged Island Approaches',   approach:'Southern corridor — Ragged Island', note:'Gateway between Inagua and Exuma threat corridors. Nearest RBDF base over 100nm away.', coords:[22.50,-75.80]},
+  ],
+  'exuma_cays': [
+    {id:'sw_great_exuma',      name:'SW Great Exuma',              label:'SW — Confirmed Interdiction Zone',    approach:'Southwest open bank approach',     note:'18 Dominicans on 100-foot steel-hulled vessel apprehended SW of Great Exuma. Scale fish and crawfish seized.', coords:[23.35,-75.90]},
+    {id:'exuma_cays_south',    name:'Exuma Cays South',            label:'Central — Southern Chain Approach',   approach:'Central Exuma Cays corridor',      note:'Southern Exuma Cays. Uninhabited cays with extensive lobster and conch grounds. Minimal patrol coverage.', coords:[23.65,-76.20]},
+    {id:'exuma_land_sea_park', name:'Exuma Cays Land and Sea Park',label:'North — BNT Managed No-Take Zone',    approach:'Northern park boundary approach',  note:'BNT managed no-take zone. Americans caught fishing illegally July 2018. World-class marine resources.', coords:[24.00,-76.50]},
   ]
 };
 let ZONE_DEFS = MPA_ZONE_DEFS['cay_sal_bank'];
@@ -1442,8 +1496,16 @@ function markerHTML(z,active){
 function updateMapMarkers(){
   if(!window._map) return;
   const mpaId = currentMPA?.mpa_id || 'cay_sal_bank';
-  const center = mpaId==='andros' ? [24.28,-78.10] : [23.75,-80.05];
-  window._map.setView(center, 8);
+  const MPA_CENTERS = {
+    'andros':        { center:[24.28,-78.10], zoom:8 },
+    'cay_sal_bank':  { center:[23.75,-80.05], zoom:8 },
+    'great_inagua':  { center:[21.20,-73.20], zoom:9 },
+    'diamond_point': { center:[23.40,-78.00], zoom:9 },
+    'jumentos_cays': { center:[22.80,-75.55], zoom:9 },
+    'exuma_cays':    { center:[23.70,-76.30], zoom:9 },
+  };
+  const mpaView = MPA_CENTERS[mpaId] || { center:[23.75,-80.05], zoom:8 };
+  window._map.setView(mpaView.center, mpaView.zoom);
 
   // Remove all existing markers
   Object.values(mapMarkers).forEach(m => { try { window._map.removeLayer(m); } catch(e){} });
@@ -1492,8 +1554,16 @@ function initMap(){
 
         // Set view AFTER tiles added — center depends on MPA
     const _mpaId = currentMPA?.mpa_id || 'cay_sal_bank';
-    const _center = _mpaId==='andros' ? [24.28,-78.10] : [23.75,-80.05];
-    map.setView(_center, 8);
+    const _MPA_CENTERS = {
+      'andros':        { center:[24.28,-78.10], zoom:8 },
+      'cay_sal_bank':  { center:[23.75,-80.05], zoom:8 },
+      'great_inagua':  { center:[21.20,-73.20], zoom:9 },
+      'diamond_point': { center:[23.40,-78.00], zoom:9 },
+      'jumentos_cays': { center:[22.80,-75.55], zoom:9 },
+      'exuma_cays':    { center:[23.70,-76.30], zoom:9 },
+    };
+    const _mpaView = _MPA_CENTERS[_mpaId] || { center:[23.75,-80.05], zoom:8 };
+    map.setView(_mpaView.center, _mpaView.zoom);
     map.invalidateSize(true);
 
   }catch(e){
