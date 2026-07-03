@@ -762,6 +762,8 @@ function selectMPA(mpa) {
 
   loadLiveData(mpa.mpa_id);
   loadAvailableDates(mpa.mpa_id);
+  // Start auto-refresh now that MPA is selected and user is logged in
+  startAutoRefresh();
 }
 
 async function switchMPA() {
@@ -976,6 +978,7 @@ async function loadLiveData(mpaId = 'cay_sal_bank') {
     buildLiveZones(r);
     updateProvenance(r);
     if (window._map) updateMapMarkers();
+    _lastDisplayedDate = r.run_date; // track what's currently displayed for auto-refresh
 
   } catch(err) {
     console.error('Data load error:', err);
@@ -1671,6 +1674,57 @@ document.addEventListener('DOMContentLoaded', function() {
   setTimeout(buildMoonCountdown, 500);
   setInterval(buildMoonCountdown, 60000);
 });
+
+
+// ── AUTO REFRESH — checks every 10 seconds for new 6AM data ──────────
+// Starts AFTER login when currentMPA and _sb are both ready
+let _lastDisplayedDate = null;
+let _autoRefreshInterval = null;
+
+async function checkForNewData() {
+  // Only run when logged in and MPA is selected
+  if (!currentMPA || !_sb || !currentMPA.mpa_id) return;
+  // Only check when viewing Today (Latest) — not historical dates
+  const dateSelect = document.getElementById('date-select');
+  if (dateSelect && dateSelect.value !== 'latest') return;
+  try {
+    const tableName = MPA_TABLES[currentMPA.mpa_id];
+    if (!tableName) return;
+    const { data, error } = await _sb
+      .from(tableName)
+      .select('run_date, run_timestamp')
+      .order('run_date', { ascending: false })
+      .limit(1);
+    if (error || !data || data.length === 0) return;
+    const latestDate = data[0].run_date;
+    if (!_lastDisplayedDate) {
+      // First check — just record current date
+      _lastDisplayedDate = latestDate;
+      return;
+    }
+    if (latestDate !== _lastDisplayedDate) {
+      // New data arrived — reload dashboard
+      _lastDisplayedDate = latestDate;
+      await loadLiveData(currentMPA.mpa_id);
+      // Show green notification
+      const notif = document.createElement('div');
+      notif.style.cssText = 'position:fixed;top:60px;right:16px;background:#17A87A;color:#fff;padding:10px 18px;border-radius:6px;font-size:12px;font-weight:700;z-index:9999;font-family:Arial,sans-serif;box-shadow:0 2px 12px rgba(0,0,0,0.4);';
+      notif.textContent = '✅ Dashboard updated — 6AM data loaded';
+      document.body.appendChild(notif);
+      setTimeout(() => notif.remove(), 5000);
+    }
+  } catch(e) {}
+}
+
+function startAutoRefresh() {
+  // Clear any existing interval
+  if (_autoRefreshInterval) clearInterval(_autoRefreshInterval);
+  // Reset last displayed date so it re-checks on MPA switch
+  _lastDisplayedDate = null;
+  // Check immediately after login then every 10 seconds
+  setTimeout(checkForNewData, 2000);
+  _autoRefreshInterval = setInterval(checkForNewData, 10 * 1000); // every 10 seconds
+}
 
 </script>
 </body>
