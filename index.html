@@ -1294,15 +1294,16 @@ function buildLiveZones(r) {
   });
 
   ZONES.sort((a,b)=>b.score-a.score);
-  activeId = ZONES[0]?.id || 'elbow_cays';
+  activeId = ZONES[0]?.id || ZONE_DEFS[0]?.id || '';
 
   // Update tide display
   // Use stored tide data — wave_max_m is waves not tides
   // Tides stored in DB from NOAA: high ~0.33-0.36m, low ~-0.05 to -0.07m
-  const tideHigh = r.wave_max_m ? 0.35 : 0.35; // placeholder until tide fields added
-  document.getElementById('tide-high').textContent = `0.35m MLLW`;
-  document.getElementById('tide-low').textContent = `−0.05m MLLW`;
-  document.getElementById('tide-restrict').textContent = 'Atoll RESTRICTED';
+  // Tide display — uses stored values where available
+  const _tHigh = parseFloat(r.wave_max_m) || 0.35;
+  document.getElementById('tide-high').textContent = `${(r.tide_high||0.35).toFixed(2)}m MLLW`;
+  document.getElementById('tide-low').textContent = `${(r.tide_low||-0.05).toFixed(2)}m MLLW`;
+  document.getElementById('tide-restrict').textContent = r.tide_restricted ? 'Atoll RESTRICTED' : 'Normal Access';
 
   buildRanking();
   buildCondStrip(ZONES[0]);
