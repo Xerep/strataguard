@@ -1489,7 +1489,7 @@ function selectZone(id){
   updateFM(z);
   updateDrivers(z);
   updateFactors(z);
-  if(window._map) updateMapMarkers();
+  if(window._map) updateMarkerStyles(); // only update dot styles, don't reset map view
 }
 
 // ── MAP ───────────────────────────────────────────────────────────────
@@ -1497,16 +1497,35 @@ function markerHTML(z,active){
   const c=lcolor(z.level);
   return `<div style="background:${c};width:${active?17:12}px;height:${active?17:12}px;border-radius:50%;border:2.5px solid ${active?'#fff':'rgba(255,255,255,0.5)'};${active?`box-shadow:0 0 10px ${c};`:''}transform:translate(-50%,-50%);cursor:pointer;"></div>`;
 }
+// updateMarkerStyles — only refreshes active/inactive dot appearance, does NOT move map
+function updateMarkerStyles(){
+  if(!window._map) return;
+  // Remove and redraw only the live score markers (not gold dots or labels)
+  Object.keys(mapMarkers).forEach(k => {
+    if (!k.startsWith('dot_') && !k.startsWith('lbl_') && k !== 'usa' && k !== 'cuba') {
+      try { window._map.removeLayer(mapMarkers[k]); } catch(e){}
+      delete mapMarkers[k];
+    }
+  });
+  ZONES.forEach(z => {
+    if (!z.coords) return;
+    const marker = L.marker(z.coords, {
+      icon: L.divIcon({html: markerHTML(z, z.id===activeId), className:'', iconSize:[17,17], iconAnchor:[8,8]})
+    }).addTo(window._map).on('click', () => selectZone(z.id));
+    mapMarkers[z.id] = marker;
+  });
+}
+
 function updateMapMarkers(){
   if(!window._map) return;
   const mpaId = currentMPA?.mpa_id || 'cay_sal_bank';
   const MPA_CENTERS = {
-    'andros':        { center:[24.38,-78.13], zoom:8  },
-    'cay_sal_bank':  { center:[23.77,-80.00], zoom:9  },
-    'great_inagua':  { center:[21.20,-73.17], zoom:9  },
-    'diamond_point': { center:[23.41,-77.99], zoom:10 },
-    'jumentos_cays': { center:[22.80,-75.57], zoom:10 },
-    'exuma_cays':    { center:[23.68,-76.20], zoom:9  },
+    'andros':        { center:[24.30,-78.10], zoom:8  },
+    'cay_sal_bank':  { center:[23.90,-80.40], zoom:9  },
+    'great_inagua':  { center:[21.20,-73.20], zoom:9  },
+    'diamond_point': { center:[23.50,-77.80], zoom:10 },
+    'jumentos_cays': { center:[22.80,-75.50], zoom:10 },
+    'exuma_cays':    { center:[23.70,-76.30], zoom:10 },
   };
   const mpaView = MPA_CENTERS[mpaId] || { center:[23.75,-80.05], zoom:8 };
   window._map.setView(mpaView.center, mpaView.zoom);
@@ -1565,12 +1584,12 @@ function initMap(){
         // Set view AFTER tiles added — center depends on MPA
     const _mpaId = currentMPA?.mpa_id || 'cay_sal_bank';
     const _MPA_CENTERS = {
-      'andros':        { center:[24.38,-78.13], zoom:8  },
-      'cay_sal_bank':  { center:[23.77,-80.00], zoom:9  },
-      'great_inagua':  { center:[21.20,-73.17], zoom:9  },
-      'diamond_point': { center:[23.41,-77.99], zoom:10 },
-      'jumentos_cays': { center:[22.80,-75.57], zoom:10 },
-      'exuma_cays':    { center:[23.68,-76.20], zoom:9  },
+      'andros':        { center:[24.30,-78.10], zoom:8  },
+      'cay_sal_bank':  { center:[23.90,-80.40], zoom:9  },
+      'great_inagua':  { center:[21.20,-73.20], zoom:9  },
+      'diamond_point': { center:[23.50,-77.80], zoom:10 },
+      'jumentos_cays': { center:[22.80,-75.50], zoom:10 },
+      'exuma_cays':    { center:[23.70,-76.30], zoom:10 },
     };
     const _mpaView = _MPA_CENTERS[_mpaId] || { center:[23.75,-80.05], zoom:8 };
     map.setView(_mpaView.center, _mpaView.zoom);
