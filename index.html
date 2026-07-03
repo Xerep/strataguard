@@ -975,6 +975,7 @@ async function loadLiveData(mpaId = 'cay_sal_bank') {
     updateTrend(trendRows);
     buildLiveZones(r);
     updateProvenance(r);
+    if (window._map) updateMapMarkers();
 
   } catch(err) {
     console.error('Data load error:', err);
@@ -1500,8 +1501,8 @@ function updateMapMarkers(){
   if(!window._map) return;
   const mpaId = currentMPA?.mpa_id || 'cay_sal_bank';
   const MPA_CENTERS = {
-    'andros':        { center:[24.38,-78.13], zoom:8 },
-    'cay_sal_bank':  { center:[23.77,-80.00], zoom:9 },
+    'andros':        { center:[24.38,-78.13], zoom:8  },
+    'cay_sal_bank':  { center:[23.77,-80.00], zoom:9  },
     'great_inagua':  { center:[21.20,-73.17], zoom:10 },
     'diamond_point': { center:[23.41,-77.99], zoom:10 },
     'jumentos_cays': { center:[22.80,-75.57], zoom:10 },
@@ -1564,8 +1565,8 @@ function initMap(){
         // Set view AFTER tiles added — center depends on MPA
     const _mpaId = currentMPA?.mpa_id || 'cay_sal_bank';
     const _MPA_CENTERS = {
-      'andros':        { center:[24.38,-78.13], zoom:8 },
-      'cay_sal_bank':  { center:[23.77,-80.00], zoom:9 },
+      'andros':        { center:[24.38,-78.13], zoom:8  },
+      'cay_sal_bank':  { center:[23.77,-80.00], zoom:9  },
       'great_inagua':  { center:[21.20,-73.17], zoom:10 },
       'diamond_point': { center:[23.41,-77.99], zoom:10 },
       'jumentos_cays': { center:[22.80,-75.57], zoom:10 },
