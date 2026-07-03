@@ -1188,9 +1188,19 @@ function buildLiveZones(r) {
   });
   // Dynamic current map — handles both Cay Sal and Andros field names
   const currentAliases = {
+    // Cay Sal Bank
     elbow_cays:'elbow', dog_rocks:'dog', cay_sal_island:'cay_sal', anguilla_cays:'anguilla',
+    // Andros
     joulter_cays:'joulter', red_bays_flat:'red_bays', north_bight:'north_bight',
-    middle_bight:'middle_bight', curley_cut_cays:'curley', mars_bay:'mars_bay'
+    middle_bight:'middle_bight', curley_cut_cays:'curley', mars_bay:'mars_bay',
+    // Great Inagua — use zone id directly (no alias needed)
+    north_east_point:'north_east_point', south_great_inagua:'south_great_inagua', little_inagua:'little_inagua',
+    // Diamond Point
+    diamond_point:'diamond_point', southern_gbb:'southern_gbb',
+    // Jumentos
+    cay_santo_domingo:'cay_santo_domingo', jumentos_north:'jumentos_north', jumentos_south:'jumentos_south',
+    // Exuma
+    sw_great_exuma:'sw_great_exuma', exuma_cays_south:'exuma_cays_south', exuma_land_sea_park:'exuma_land_sea_park',
   };
   const ckMap = {};
   ZONE_DEFS.forEach(zd => {
@@ -1206,7 +1216,7 @@ function buildLiveZones(r) {
   const icons2 = {CRITICAL:'🔴',HIGH:'🔴',ELEVATED:'🟠',MODERATE:'🟡',LOW:'🟢',MINIMAL:'⚪'};
 
   // Priority zone
-  const priorityId = Object.entries(scoreMap).sort((a,b)=>b[1]-a[1])[0]?.[0] || 'anguilla_cays';
+  const priorityId = Object.entries(scoreMap).sort((a,b)=>b[1]-a[1])[0]?.[0] || ZONE_DEFS[0]?.id || '';
 
   ZONES = ZONE_DEFS.map(zd => {
     const score = scoreMap[zd.id] || 0;
@@ -1503,7 +1513,25 @@ function updateMapMarkers(){
   Object.values(mapMarkers).forEach(m => { try { window._map.removeLayer(m); } catch(e){} });
   mapMarkers = {};
 
-  // Rebuild markers for current zones
+  // Draw static zone markers from ZONE_DEFS (gold dots + labels)
+  const currentZoneDefs = MPA_ZONE_DEFS[mpaId] || [];
+  currentZoneDefs.forEach(zd => {
+    const icon = L.divIcon({html:`<div style="background:var(--gold);width:14px;height:14px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 0 10px rgba(200,149,42,1);transform:translate(-50%,-50%);"></div>`,className:'',iconSize:[12,12],iconAnchor:[6,6]});
+    const m = L.marker(zd.coords, {icon}).addTo(window._map)
+      .bindPopup(`<strong>${zd.name}</strong><br><span style="font-size:10px;color:#5A6B7A;">${zd.label}</span><br><span style="font-size:10px;color:#B85042;">${zd.note}</span>`)
+      .on('click', () => selectZone(zd.id));
+    mapMarkers['dot_'+zd.id] = m;
+    const lbl = L.marker(zd.coords, {icon:L.divIcon({html:`<div style="font-size:7.5px;color:#fff;font-weight:700;white-space:nowrap;background:rgba(27,42,74,0.85);padding:1px 5px;border-radius:3px;margin-top:9px;border:1px solid rgba(255,69,0,0.5);">${zd.name}</div>`,className:'',iconAnchor:[-2,-2]})}).addTo(window._map);
+    mapMarkers['lbl_'+zd.id] = lbl;
+  });
+
+  // Country reference labels — shown for all MPAs
+  const usaLbl = L.marker([25.3,-80.3],{icon:L.divIcon({html:`<div style="font-size:8px;color:#fff;font-weight:700;background:rgba(27,42,74,0.85);padding:2px 5px;border-radius:3px;">🇺🇸 Florida</div>`,className:'',iconAnchor:[28,8]})}).addTo(window._map);
+  mapMarkers['usa'] = usaLbl;
+  const cubaLbl = L.marker([22.6,-81.5],{icon:L.divIcon({html:`<div style="font-size:8px;color:#fff;font-weight:700;background:rgba(27,42,74,0.85);padding:2px 5px;border-radius:3px;">🇨🇺 Cuba</div>`,className:'',iconAnchor:[18,8]})}).addTo(window._map);
+  mapMarkers['cuba'] = cubaLbl;
+
+  // Live zone score markers on top
   ZONES.forEach(z => {
     if (!z.coords) return;
     const marker = L.marker(z.coords, {
@@ -1530,19 +1558,7 @@ function initMap(){
       attribution:'', maxZoom:17, opacity:0.7
     }).addTo(map);
 
-    L.circle([23.78,-80.0],{color:'#C8952A',fillColor:'#C8952A',fillOpacity:0.04,weight:2,dashArray:'8,6',radius:58000}).addTo(map);
-
-    ZONE_DEFS.forEach(zd=>{
-      const icon=L.divIcon({html:`<div style="background:var(--gold);width:16px;height:16px;border-radius:50%;border:3px solid #fff;box-shadow:0 0 12px rgba(200,149,42,1),0 0 24px rgba(200,149,42,0.5);transform:translate(-50%,-50%);"></div>`,className:'',iconSize:[12,12],iconAnchor:[6,6]});
-      const m=L.marker(zd.coords,{icon}).addTo(map)
-        .bindPopup(`<strong>${zd.name}</strong><br><span style="font-size:10px;color:#5A6B7A;">${zd.label}</span><br><span style="font-size:10px;color:#B85042;">${zd.note}</span>`)
-        .on('click',()=>selectZone(zd.id));
-      mapMarkers[zd.id]=m;
-      L.marker(zd.coords,{icon:L.divIcon({html:`<div style="font-size:7.5px;color:#fff;font-weight:700;white-space:nowrap;background:rgba(27,42,74,0.85);padding:1px 5px;border-radius:3px;margin-top:9px;border:1px solid rgba(255,69,0,0.5);">${zd.name}</div>`,className:'',iconAnchor:[-2,-2]})}).addTo(map);
-    });
-
-    L.marker([25.3,-80.3],{icon:L.divIcon({html:`<div style="font-size:8px;color:#fff;font-weight:700;background:rgba(27,42,74,0.85);padding:2px 5px;border-radius:3px;">🇺🇸 Florida Keys</div>`,className:'',iconAnchor:[28,8]})}).addTo(map);
-    L.marker([22.6,-81.5],{icon:L.divIcon({html:`<div style="font-size:8px;color:#fff;font-weight:700;background:rgba(27,42,74,0.85);padding:2px 5px;border-radius:3px;">🇨🇺 Cuba</div>`,className:'',iconAnchor:[18,8]})}).addTo(map);
+    // Markers are drawn dynamically in updateMapMarkers when MPA is selected
 
         // Set view AFTER tiles added — center depends on MPA
     const _mpaId = currentMPA?.mpa_id || 'cay_sal_bank';
