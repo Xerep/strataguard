@@ -727,6 +727,7 @@ function selectMPA(mpa) {
   currentMPA = mpa;
   // Update zone definitions for this MPA
   ZONE_DEFS = MPA_ZONE_DEFS[mpa.mpa_id] || MPA_ZONE_DEFS['cay_sal_bank'];
+  activeId = ZONE_DEFS[0]?.id || ''; // reset active zone to first zone of new MPA
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('mpa-select-screen').classList.remove('visible');
   document.getElementById('dashboard-content').classList.add('visible');
@@ -1499,12 +1500,12 @@ function updateMapMarkers(){
   if(!window._map) return;
   const mpaId = currentMPA?.mpa_id || 'cay_sal_bank';
   const MPA_CENTERS = {
-    'andros':        { center:[24.28,-78.10], zoom:8 },
-    'cay_sal_bank':  { center:[23.75,-80.05], zoom:8 },
-    'great_inagua':  { center:[21.20,-73.20], zoom:9 },
-    'diamond_point': { center:[23.40,-78.00], zoom:9 },
-    'jumentos_cays': { center:[22.80,-75.55], zoom:9 },
-    'exuma_cays':    { center:[23.70,-76.30], zoom:9 },
+    'andros':        { center:[24.38,-78.13], zoom:8 },
+    'cay_sal_bank':  { center:[23.77,-80.00], zoom:9 },
+    'great_inagua':  { center:[21.20,-73.17], zoom:10 },
+    'diamond_point': { center:[23.41,-77.99], zoom:10 },
+    'jumentos_cays': { center:[22.80,-75.57], zoom:10 },
+    'exuma_cays':    { center:[23.68,-76.20], zoom:10 },
   };
   const mpaView = MPA_CENTERS[mpaId] || { center:[23.75,-80.05], zoom:8 };
   window._map.setView(mpaView.center, mpaView.zoom);
@@ -1563,12 +1564,12 @@ function initMap(){
         // Set view AFTER tiles added — center depends on MPA
     const _mpaId = currentMPA?.mpa_id || 'cay_sal_bank';
     const _MPA_CENTERS = {
-      'andros':        { center:[24.28,-78.10], zoom:8 },
-      'cay_sal_bank':  { center:[23.75,-80.05], zoom:8 },
-      'great_inagua':  { center:[21.20,-73.20], zoom:9 },
-      'diamond_point': { center:[23.40,-78.00], zoom:9 },
-      'jumentos_cays': { center:[22.80,-75.55], zoom:9 },
-      'exuma_cays':    { center:[23.70,-76.30], zoom:9 },
+      'andros':        { center:[24.38,-78.13], zoom:8 },
+      'cay_sal_bank':  { center:[23.77,-80.00], zoom:9 },
+      'great_inagua':  { center:[21.20,-73.17], zoom:10 },
+      'diamond_point': { center:[23.41,-77.99], zoom:10 },
+      'jumentos_cays': { center:[22.80,-75.57], zoom:10 },
+      'exuma_cays':    { center:[23.68,-76.20], zoom:10 },
     };
     const _mpaView = _MPA_CENTERS[_mpaId] || { center:[23.75,-80.05], zoom:8 };
     map.setView(_mpaView.center, _mpaView.zoom);
