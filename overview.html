@@ -253,6 +253,14 @@ header::before{content:'';position:absolute;right:-60px;top:-60px;width:240px;he
       </div>
 
       <div class="layer-row">
+        <button class="layer-toggle" id="toggle-eez" onclick="toggleLayer('eez')"><span class="knob"></span></button>
+        <div class="layer-info">
+          <div class="layer-name">Bahamas EEZ Boundary</div>
+          <div class="layer-status live" id="status-eez">● Marine Regions (VLIZ)</div>
+        </div>
+      </div>
+
+      <div class="layer-row">
         <button class="layer-toggle" id="toggle-concessions" onclick="toggleLayer('concessions')"><span class="knob"></span></button>
         <div class="layer-info">
           <div class="layer-name">Foreign Yacht &amp; Commercial Concessions</div>
@@ -491,6 +499,36 @@ function loadSARLayer() {
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   BAHAMAS EEZ BOUNDARY — pulled live from Marine Regions (VLIZ),
+   the standard open-access authority for maritime boundaries
+   worldwide. This is NOT an embedded copy — every page load fetches
+   current map tiles directly from their service, filtered to just
+   the Bahamas (MRGID 8404). This avoids ever hand-simplifying or
+   guessing at a legal maritime boundary ourselves.
+
+   Source: Flanders Marine Institute (VLIZ), Maritime Boundaries
+   Geodatabase — https://www.marineregions.org/eezdetails.php?mrgid=8404
+   License: CC-BY 4.0
+   ═══════════════════════════════════════════════════════════════ */
+let eezLayer = null;
+
+function getEezLayer() {
+  if (!eezLayer) {
+    eezLayer = L.tileLayer.wms('https://geo.vliz.be/geoserver/MarineRegions/wms', {
+      layers: 'eez',
+      format: 'image/png',
+      transparent: true,
+      version: '1.1.1',
+      cql_filter: 'mrgid_eez=8404', // Bahamas only, not the whole world layer
+      attribution: 'EEZ boundary © Flanders Marine Institute (VLIZ), CC-BY 4.0',
+      opacity: 0.55,
+    });
+  }
+  return eezLayer;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════
    MAP INIT
    ═══════════════════════════════════════════════════════════════ */
 let map, mpaLayerGroup;
@@ -599,7 +637,7 @@ function closePanel() {
 /* ═══════════════════════════════════════════════════════════════
    LAYER TOGGLES
    ═══════════════════════════════════════════════════════════════ */
-const layerState = { mpa: true, concessions: false, rbdf: false, sar: false };
+const layerState = { mpa: true, eez: false, concessions: false, rbdf: false, sar: false };
 
 function showLockedToast(msg) {
   const t = document.getElementById('locked-toast');
@@ -624,6 +662,9 @@ function toggleLayer(key) {
 
   if (key === 'mpa') {
     if (layerState.mpa) mpaLayerGroup.addTo(map); else map.removeLayer(mpaLayerGroup);
+  }
+  if (key === 'eez') {
+    if (layerState.eez) getEezLayer().addTo(map); else map.removeLayer(getEezLayer());
   }
   if (key === 'concessions') {
     if (!concessionLayerGroup) { loadConcessionLayer().then(() => { if (layerState.concessions) concessionLayerGroup.addTo(map); }); }
