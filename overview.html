@@ -305,7 +305,8 @@ header::before{content:'';position:absolute;right:-60px;top:-60px;width:240px;he
    dashboard. Your build/deploy step already replaces these tokens.
    ═══════════════════════════════════════════════════════════════ */
 const { createClient } = supabase;
-const _sb = createClient('https://aspnjdmtfcezomvxcybk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzcG5qZG10ZmNlem9tdnhjeWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2Mzc4MTEsImV4cCI6MjA5NzIxMzgxMX0.XElNTEJz7hc4H54YssQ0NvgNC7VifPSpT6Qlfi51JGs');
+const _sb = createClient('https://aspnjdmtfcezomvxcybk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzcG5qZG10ZmNlem9tdnhjeWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2Mzc4MTEsImV4cCI6MjA5NzIxMzgxMX0.XElNTEJz7hc4H54YssQ0NvgNC7VifPSpT6Qlfi51JGs')
+
 /* ═══════════════════════════════════════════════════════════════
    MPA REGISTRY — pulled from the same source of truth as the
    Zone Dashboard (table names, centers, zone counts, icons)
@@ -519,7 +520,7 @@ function getEezLayer() {
       format: 'image/png',
       transparent: true,
       version: '1.1.1',
-      cql_filter: 'mrgid_eez=8404', // Bahamas only, not the whole world layer
+      cql_filter: 'mrgid=8404', // Bahamas only, not the whole world layer
       attribution: 'EEZ boundary © Flanders Marine Institute (VLIZ), CC-BY 4.0',
       opacity: 0.55,
     });
