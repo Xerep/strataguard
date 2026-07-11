@@ -256,7 +256,7 @@ header::before{content:'';position:absolute;right:-60px;top:-60px;width:240px;he
         <button class="layer-toggle" id="toggle-concessions" onclick="toggleLayer('concessions')"><span class="knob"></span></button>
         <div class="layer-info">
           <div class="layer-name">Foreign Yacht &amp; Commercial Concessions</div>
-          <div class="layer-status pending" id="status-concessions">◐ Awaiting DMR data</div>
+          <div class="layer-status pending" id="status-concessions">◐ Loading...</div>
         </div>
       </div>
 
@@ -297,7 +297,7 @@ header::before{content:'';position:absolute;right:-60px;top:-60px;width:240px;he
    dashboard. Your build/deploy step already replaces these tokens.
    ═══════════════════════════════════════════════════════════════ */
 const { createClient } = supabase;
-const _sb = createClient('https://aspnjdmtfcezomvxcybk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzcG5qZG10ZmNlem9tdnhjeWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2Mzc4MTEsImV4cCI6MjA5NzIxMzgxMX0.XElNTEJz7hc4H54YssQ0NvgNC7VifPSpT6Qlfi51JGs');
+const _sb = createClient('__SUPABASE_URL__', '__SUPABASE_KEY__');
 
 /* ═══════════════════════════════════════════════════════════════
    MPA REGISTRY — pulled from the same source of truth as the
@@ -354,10 +354,24 @@ const MANUAL_CONCESSION_POINTS = [
   // { lat: 24.30, lng: -78.10, name: 'Example Charter Operator', type: 'charter', source: 'public notice, [cite]' },
 ];
 
+/* ═══════════════════════════════════════════════════════════════
+   AIS VESSEL DATA — fed by the n8n AIS Compliance Monitor workflow.
+   Two record types, both read here, styled differently on the map:
+
+     ais_vessel_log   — 50ft+ foreign vessels detected broadcasting
+                         AIS near a monitored MPA (today's snapshot)
+     ais_dark_events  — vessels that stopped broadcasting inside a
+                         zone (the actual Reg. 40B violation signal)
+
+   Both tables are written automatically by the daily n8n run —
+   nothing manual needed here once that workflow is live.
+   ═══════════════════════════════════════════════════════════════ */
 let concessionLayerGroup = null;
 
 async function loadConcessionLayer() {
   const points = [...MANUAL_CONCESSION_POINTS];
+  let vesselCount = 0, darkEventCount = 0;
+
   try {
     const { data, error } = await _sb
       .from('concession_records')
@@ -365,11 +379,60 @@ async function loadConcessionLayer() {
     if (!error && data) {
       data.forEach(r => points.push({
         lat: r.lat, lng: r.lng, name: r.holder_name,
-        type: r.concession_type, source: 'DMR registry'
+        type: r.concession_type, source: 'DMR registry', kind: 'concession'
       }));
     }
   } catch (e) {
     // Table doesn't exist yet — expected until the DMR letter lands. Silent by design.
+  }
+
+  // Today's AIS vessel detections (most recent run_date on file)
+  try {
+    const { data: latestRun } = await _sb
+      .from('ais_vessel_log')
+      .select('run_date')
+      .order('run_date', { ascending: false })
+      .limit(1);
+    if (latestRun && latestRun.length > 0) {
+      const { data: vessels, error } = await _sb
+        .from('ais_vessel_log')
+        .select('mmsi, vessel_name, flag, length_m, lat, lon, zone_id, ais_timestamp')
+        .eq('run_date', latestRun[0].run_date);
+      if (!error && vessels) {
+        vesselCount = vessels.length;
+        vessels.forEach(v => points.push({
+          lat: v.lat, lng: v.lon,
+          name: v.vessel_name + ' (' + v.flag + ')',
+          type: 'AIS vessel — ' + Math.round(v.length_m) + 'ft',
+          source: 'VesselAPI · ' + latestRun[0].run_date,
+          kind: 'vessel'
+        }));
+      }
+    }
+  } catch (e) {
+    // ais_vessel_log not populated yet — silent, same pattern as concessions
+  }
+
+  // Recent dark events (last 7 days) — the actual compliance violations
+  try {
+    const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+    const { data: darkEvents, error } = await _sb
+      .from('ais_dark_events')
+      .select('mmsi, vessel_name, flag, last_known_lat, last_known_lon, last_known_zone_id, detected_run_date, resolved')
+      .gte('detected_run_date', sevenDaysAgo)
+      .eq('resolved', false);
+    if (!error && darkEvents) {
+      darkEventCount = darkEvents.length;
+      darkEvents.forEach(d => points.push({
+        lat: d.last_known_lat, lng: d.last_known_lon,
+        name: (d.vessel_name || 'Unknown vessel') + ' (' + (d.flag || 'unknown flag') + ')',
+        type: 'WENT DARK — ' + d.detected_run_date,
+        source: 'Reg. 40B violation — AIS stopped broadcasting',
+        kind: 'dark_event'
+      }));
+    }
+  } catch (e) {
+    // ais_dark_events not populated yet — silent, same pattern
   }
 
   if (!concessionLayerGroup) concessionLayerGroup = L.layerGroup();
@@ -382,15 +445,24 @@ async function loadConcessionLayer() {
     return;
   }
 
-  statusEl.textContent = '● ' + points.length + ' record' + (points.length === 1 ? '' : 's') + ' loaded';
+  const parts = [];
+  if (vesselCount > 0) parts.push(vesselCount + ' vessel' + (vesselCount === 1 ? '' : 's'));
+  if (darkEventCount > 0) parts.push(darkEventCount + ' dark event' + (darkEventCount === 1 ? '' : 's'));
+  const concessionOnlyCount = points.length - vesselCount - darkEventCount;
+  if (concessionOnlyCount > 0) parts.push(concessionOnlyCount + ' concession' + (concessionOnlyCount === 1 ? '' : 's'));
+  statusEl.textContent = '● ' + (parts.length > 0 ? parts.join(', ') : points.length + ' record(s)') + ' loaded';
   statusEl.className = 'layer-status live';
 
   points.forEach(p => {
-    const marker = L.circleMarker([p.lat, p.lng], {
-      radius: 7, color: '#E8B84B', weight: 2,
-      fillColor: '#C8952A', fillOpacity: 0.55
-    }).bindPopup(
-      '<div class="mp-popup-name">' + (p.name || 'Unnamed record') + '</div>' +
+    // Dark events get a distinct alarming style — this is the actual violation signal
+    const style = p.kind === 'dark_event'
+      ? { radius: 9, color: '#C0392B', weight: 3, fillColor: '#C0392B', fillOpacity: 0.35, dashArray: '3,3' }
+      : p.kind === 'vessel'
+      ? { radius: 6, color: '#1A9BB5', weight: 2, fillColor: '#0D6E8A', fillOpacity: 0.6 }
+      : { radius: 7, color: '#E8B84B', weight: 2, fillColor: '#C8952A', fillOpacity: 0.55 };
+
+    const marker = L.circleMarker([p.lat, p.lng], style).bindPopup(
+      '<div class="mp-popup-name">' + (p.kind === 'dark_event' ? '⚠️ ' : '') + (p.name || 'Unnamed record') + '</div>' +
       '<div class="mp-popup-score">' + (p.type || 'concession') + ' · ' + (p.source || 'manual') + '</div>'
     );
     concessionLayerGroup.addLayer(marker);
