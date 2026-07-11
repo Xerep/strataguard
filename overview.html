@@ -22,6 +22,52 @@
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Segoe UI',Calibri,sans-serif;background:var(--ice);color:var(--ink);font-size:13px;overflow:hidden;}
 
+/* ── LOGIN / ACCESS GATE (same visual language as main dashboard) ── */
+#login-screen{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:linear-gradient(135deg,#0D1B2A 0%,#1B2A4A 50%,#065A82 100%);
+  display:flex;align-items:center;justify-content:center;
+  z-index:9999;
+}
+#login-screen.hidden{display:none;}
+.login-box{
+  background:rgba(255,255,255,0.05);
+  border:1px solid rgba(200,149,42,0.35);
+  border-radius:16px;padding:44px 52px;
+  text-align:center;max-width:440px;width:92%;
+  backdrop-filter:blur(10px);
+  box-shadow:0 20px 60px rgba(0,0,0,0.4);
+}
+.login-brand{font-size:26px;font-weight:700;color:var(--gold2);letter-spacing:1.5px;margin-bottom:2px;}
+.login-platform{font-size:10px;color:#9FD3E8;letter-spacing:3px;text-transform:uppercase;margin-bottom:6px;}
+.login-motto{font-size:13px;color:#17A87A;font-style:italic;font-weight:500;margin-bottom:24px;letter-spacing:0.5px;}
+.login-divider{height:1px;background:rgba(255,255,255,0.1);margin:0 -8px 22px;}
+.login-restricted-tag{
+  display:inline-block;font-size:8.5px;letter-spacing:1.5px;text-transform:uppercase;
+  color:#F0A040;background:rgba(212,102,10,0.15);border:1px solid rgba(212,102,10,0.4);
+  padding:4px 10px;border-radius:12px;margin-bottom:22px;font-weight:700;
+}
+.login-label{font-size:10px;color:#9FD3E8;text-align:left;display:block;margin-bottom:5px;letter-spacing:0.8px;text-transform:uppercase;}
+.login-input{
+  width:100%;padding:12px 15px;border-radius:8px;
+  background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);
+  color:#fff;font-size:14px;font-family:'Segoe UI',Calibri,sans-serif;
+  margin-bottom:14px;outline:none;transition:border 0.2s;
+}
+.login-input:focus{border-color:var(--gold);background:rgba(255,255,255,0.1);}
+.login-input::placeholder{color:rgba(255,255,255,0.25);}
+.login-btn{
+  width:100%;padding:14px;border-radius:8px;
+  background:linear-gradient(90deg,var(--gold),var(--gold2));
+  border:none;color:#1B2A4A;font-size:13px;font-weight:700;
+  cursor:pointer;letter-spacing:1px;margin-top:6px;
+  transition:all 0.2s;text-transform:uppercase;
+}
+.login-btn:hover{transform:translateY(-1px);box-shadow:0 4px 15px rgba(200,149,42,0.3);}
+.login-btn:disabled{opacity:0.5;cursor:not-allowed;transform:none;}
+.login-error{color:#FF8080;font-size:11.5px;margin-top:10px;min-height:16px;text-align:center;}
+.login-footer{margin-top:26px;font-size:9.5px;color:rgba(255,255,255,0.2);line-height:1.6;}
+
 /* ── HEADER (matches dashboard header) ───────────────────────── */
 .gold-bar{height:5px;background:linear-gradient(90deg,var(--gold),var(--gold2),var(--gold));}
 header{background:linear-gradient(135deg,var(--navy) 0%,var(--deep) 60%,var(--teal) 100%);color:#fff;position:relative;overflow:hidden;}
@@ -38,7 +84,8 @@ header::before{content:'';position:absolute;right:-60px;top:-60px;width:240px;he
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
 
 /* ── LAYOUT ───────────────────────────────────────────────────── */
-#app{display:flex;height:calc(100vh - 74px);}
+#app{display:none;height:calc(100vh - 74px);}
+#app.visible{display:flex;}
 #map{flex:1;height:100%;background:#0D1B2A;}
 #side-panel{
   width:320px;background:#fff;border-left:1px solid var(--line);
@@ -146,6 +193,37 @@ header::before{content:'';position:absolute;right:-60px;top:-60px;width:240px;he
 </head>
 <body>
 
+<div id="login-screen">
+  <div class="login-box">
+    <svg width="52" height="60" viewBox="0 0 120 136" style="margin-bottom:8px;">
+      <defs><clipPath id="lshield2"><path d="M60 6 L108 22 L108 72 C108 100 60 130 60 130 C60 130 12 100 12 72 L12 22 Z"/></clipPath></defs>
+      <path d="M60 6 L108 22 L108 72 C108 100 60 130 60 130 C60 130 12 100 12 72 L12 22 Z" fill="#071D3B" stroke="#17A87A" stroke-width="2.5"/>
+      <rect x="12" y="6" width="48" height="130" fill="#0D2E55" clip-path="url(#lshield2)"/>
+      <line x1="60" y1="14" x2="60" y2="122" stroke="#17A87A" stroke-width="1.5" opacity="0.9"/>
+      <text x="34" y="76" font-family="Georgia,serif" font-size="26" fill="#17A87A" text-anchor="middle" font-weight="700">Σ∆</text>
+      <text x="86" y="76" font-family="Georgia,serif" font-size="26" fill="#9FE1CB" text-anchor="middle" font-weight="700">π√</text>
+    </svg>
+    <div class="login-brand">StrataGuard</div>
+    <div class="login-platform">National Overview</div>
+    <div class="login-motto">"Math Reacts to Reality"</div>
+    <div class="login-restricted-tag">🔒 Restricted Access</div>
+    <div class="login-divider"></div>
+    <div style="text-align:left;">
+      <label class="login-label">Email Address</label>
+      <input class="login-input" type="email" id="login-email" placeholder="your@email.com" autocomplete="email"/>
+      <label class="login-label">Password</label>
+      <input class="login-input" type="password" id="login-password" placeholder="••••••••" autocomplete="current-password"/>
+      <button class="login-btn" id="login-btn" onclick="handleLogin()">ACCESS OVERVIEW</button>
+      <div class="login-error" id="login-error"></div>
+    </div>
+    <div class="login-footer">
+      This page is limited to a named list of authorized viewers,<br>separate from standard dashboard access.<br>
+      StrataGuard Intelligence · Bahamas Marine Enforcement
+    </div>
+  </div>
+</div>
+
+<div id="main-content" style="display:none;">
 <div class="gold-bar"></div>
 <header>
   <div class="header-inner">
@@ -211,6 +289,7 @@ header::before{content:'';position:absolute;right:-60px;top:-60px;width:240px;he
     </div>
   </div>
 </div>
+</div><!-- /#main-content -->
 
 <script>
 /* ═══════════════════════════════════════════════════════════════
@@ -218,7 +297,7 @@ header::before{content:'';position:absolute;right:-60px;top:-60px;width:240px;he
    dashboard. Your build/deploy step already replaces these tokens.
    ═══════════════════════════════════════════════════════════════ */
 const { createClient } = supabase;
-const _sb = createClient('https://aspnjdmtfcezomvxcybk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzcG5qZG10ZmNlem9tdnhjeWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2Mzc4MTEsImV4cCI6MjA5NzIxMzgxMX0.XElNTEJz7hc4H54YssQ0NvgNC7VifPSpT6Qlfi51JGs');
+const _sb = createClient('__SUPABASE_URL__', '__SUPABASE_KEY__');
 
 /* ═══════════════════════════════════════════════════════════════
    MPA REGISTRY — pulled from the same source of truth as the
@@ -439,7 +518,7 @@ function openPanel(mpaId, score, tier, lastUpdated) {
       '<div class="panel-section-title">About This Score</div>' +
       '<div class="panel-note">Composite of 14 environmental and regulatory factors, refreshed daily at 6:00 AM Nassau time. Predicts conditions favorable to undetected illegal fishing — does not detect vessels directly.</div>' +
     '</div>' +
-    '<a href="#" class="panel-cta" onclick="alert(\'Wire this to the Zone Dashboard URL for \' + \'' + meta.name + '\');return false;">View Full Zone Dashboard</a>';
+    '<a href="https://xerep.github.io/strataguard/" class="panel-cta">View Full Zone Dashboard</a>';
 }
 
 function closePanel() {
@@ -483,11 +562,81 @@ function toggleLayer(key) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   INIT
+   ACCESS GATE — logs in via the same Supabase auth as the main
+   dashboard, then checks the user's email against a short allowlist
+   table. Being a valid dashboard login is NOT enough by itself —
+   they must also appear in `overview_access`.
+
+   One-time setup in Supabase (SQL editor):
+
+     create table overview_access (
+       id         uuid primary key default gen_random_uuid(),
+       email      text unique not null,
+       active     boolean default true,
+       note       text,
+       added_at   timestamptz default now()
+     );
+
+     insert into overview_access (email, note) values
+       ('rashad@strataguardintel.com', 'owner');
+       -- add more rows here for each named contact you approve
+
+   Row Level Security note: leave RLS OFF on this table (or add a
+   public-read policy) the same way your threat-log tables work —
+   this check runs before the person is "inside" the app, so it
+   needs to be readable by an anon key.
    ═══════════════════════════════════════════════════════════════ */
-document.addEventListener('DOMContentLoaded', () => {
+async function handleLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const password = document.getElementById('login-password').value;
+  const btn = document.getElementById('login-btn');
+  const errEl = document.getElementById('login-error');
+
+  if (!email || !password) { errEl.textContent = 'Please enter your email and password.'; return; }
+
+  btn.disabled = true;
+  btn.textContent = 'CHECKING ACCESS...';
+  errEl.textContent = '';
+
+  const { data, error } = await _sb.auth.signInWithPassword({ email, password });
+
+  if (error) {
+    errEl.textContent = error.message === 'Invalid login credentials'
+      ? 'Invalid email or password.'
+      : error.message;
+    btn.disabled = false;
+    btn.textContent = 'ACCESS OVERVIEW';
+    return;
+  }
+
+  // Valid login confirmed — now check the restricted allowlist
+  const { data: allowRow, error: allowErr } = await _sb
+    .from('overview_access')
+    .select('email, active')
+    .eq('email', email)
+    .eq('active', true)
+    .maybeSingle();
+
+  if (allowErr || !allowRow) {
+    errEl.textContent = 'This account can access the regular dashboard, but is not on the National Overview access list.';
+    await _sb.auth.signOut();
+    btn.disabled = false;
+    btn.textContent = 'ACCESS OVERVIEW';
+    return;
+  }
+
+  // Authorized — reveal the page
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('main-content').style.display = 'block';
+  document.getElementById('app').classList.add('visible');
   initMap();
-  loadConcessionLayer(); // pre-load silently so the count is accurate the first time it's toggled on
+  loadConcessionLayer();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('login-password').addEventListener('keypress', e => {
+    if (e.key === 'Enter') handleLogin();
+  });
 });
 </script>
 </body>
