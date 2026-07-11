@@ -248,7 +248,7 @@ header::before{content:'';position:absolute;right:-60px;top:-60px;width:240px;he
         <button class="layer-toggle on" id="toggle-mpa" onclick="toggleLayer('mpa')"><span class="knob"></span></button>
         <div class="layer-info">
           <div class="layer-name">MPA Threat Zones</div>
-          <div class="layer-status live" id="status-mpa">● Live — Supabase</div>
+          <div class="layer-status live" id="status-mpa">● Live</div>
         </div>
       </div>
 
@@ -403,7 +403,7 @@ async function loadConcessionLayer() {
           lat: v.lat, lng: v.lon,
           name: v.vessel_name + ' (' + v.flag + ')',
           type: 'AIS vessel — ' + Math.round(v.length_m) + 'ft',
-          source: 'VesselAPI · ' + latestRun[0].run_date,
+          source: 'AIS detection · ' + latestRun[0].run_date,
           kind: 'vessel'
         }));
       }
@@ -439,7 +439,7 @@ async function loadConcessionLayer() {
 
   const statusEl = document.getElementById('status-concessions');
   if (points.length === 0) {
-    statusEl.textContent = '◐ Awaiting DMR data';
+    statusEl.textContent = '◐ No records yet';
     statusEl.className = 'layer-status pending';
     return;
   }
