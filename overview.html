@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StrataGuard — National Overview</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   Brand tokens — matched exactly to StrataGuard_Dashboard_Final_v2_6
+   ══════════════════════════════════════════════════════════════════ */
+:root{
+  --navy:#1B2A4A;--deep:#065A82;--teal:#0D6E8A;--teal2:#1A9BB5;
+  --ice:#EAF4F8;--gold:#C8952A;--gold2:#E8B84B;
+  --red:#C0392B;--orange:#D4660A;--green:#1A6B3C;
+  --white:#FFFFFF;--ink:#16242E;--slate:#5A6B7A;--line:#D0DCE4;
+  --enable:#B85042;--deter:#0B6E6E;--mixed:#C8952A;
+  --locked:#3A4A5E;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Segoe UI',Calibri,sans-serif;background:var(--ice);color:var(--ink);font-size:13px;overflow:hidden;}
+
+/* ── HEADER (matches dashboard header) ───────────────────────── */
+.gold-bar{height:5px;background:linear-gradient(90deg,var(--gold),var(--gold2),var(--gold));}
+header{background:linear-gradient(135deg,var(--navy) 0%,var(--deep) 60%,var(--teal) 100%);color:#fff;position:relative;overflow:hidden;}
+header::before{content:'';position:absolute;right:-60px;top:-60px;width:240px;height:240px;border-radius:50%;background:rgba(255,255,255,0.03);}
+.header-inner{display:flex;justify-content:space-between;align-items:center;padding:12px 24px;position:relative;z-index:1;flex-wrap:wrap;gap:10px;}
+.brand-eye{font-size:9px;letter-spacing:4px;color:#9FD3E8;text-transform:uppercase;font-weight:600;margin-bottom:1px;}
+.brand-motto{font-size:10px;color:#17A87A;font-style:italic;font-weight:500;letter-spacing:0.5px;}
+.brand-title{font-size:17px;font-weight:700;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.back-link{font-size:10px;color:#9FD3E8;text-decoration:none;border:1px solid rgba(255,255,255,0.2);padding:6px 12px;border-radius:6px;transition:all .2s;}
+.back-link:hover{border-color:var(--gold);color:var(--gold2);}
+.live-badge{font-size:8px;font-weight:700;color:#5DC98A;background:rgba(26,107,60,0.25);border:1px solid rgba(26,107,60,0.5);padding:3px 9px;border-radius:10px;letter-spacing:1px;text-transform:uppercase;}
+.live-badge .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:#5DC98A;margin-right:5px;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+/* ── LAYOUT ───────────────────────────────────────────────────── */
+#app{display:flex;height:calc(100vh - 74px);}
+#map{flex:1;height:100%;background:#0D1B2A;}
+#side-panel{
+  width:320px;background:#fff;border-left:1px solid var(--line);
+  overflow-y:auto;flex-shrink:0;
+  transition:margin-right .25s ease;
+}
+#side-panel.collapsed{margin-right:-320px;}
+
+/* ── LAYER CONTROL ────────────────────────────────────────────── */
+.layer-control{
+  position:absolute;top:14px;right:14px;z-index:900;
+  background:rgba(27,42,74,0.94);backdrop-filter:blur(6px);
+  border:1px solid rgba(200,149,42,0.35);border-radius:10px;
+  padding:12px 14px;width:250px;color:#fff;
+  box-shadow:0 8px 24px rgba(0,0,0,0.3);
+}
+.layer-control-title{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--gold2);font-weight:700;margin-bottom:10px;}
+.layer-row{display:flex;align-items:flex-start;gap:9px;padding:7px 0;border-top:1px solid rgba(255,255,255,0.08);}
+.layer-row:first-of-type{border-top:none;}
+.layer-toggle{
+  position:relative;width:32px;height:18px;flex-shrink:0;margin-top:1px;
+  background:rgba(255,255,255,0.15);border-radius:10px;cursor:pointer;
+  transition:background .2s;border:none;
+}
+.layer-toggle.on{background:var(--gold);}
+.layer-toggle.locked{background:var(--locked);cursor:not-allowed;opacity:.6;}
+.layer-toggle .knob{position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#fff;transition:left .2s;}
+.layer-toggle.on .knob{left:16px;}
+.layer-info{flex:1;}
+.layer-name{font-size:10.5px;font-weight:700;color:#fff;line-height:1.3;}
+.layer-status{font-size:8.5px;margin-top:2px;line-height:1.3;}
+.layer-status.live{color:#5DC98A;}
+.layer-status.pending{color:#F0A040;}
+.layer-status.locked{color:#7A8CA0;}
+
+/* ── SIDE PANEL CONTENT ───────────────────────────────────────── */
+.panel-empty{padding:40px 22px;text-align:center;color:var(--slate);}
+.panel-empty-icon{font-size:32px;margin-bottom:10px;opacity:.4;}
+.panel-empty-text{font-size:11px;line-height:1.6;}
+
+.panel-header{padding:18px 20px 14px;border-bottom:1px solid var(--line);}
+.panel-mpa-icon{font-size:26px;margin-bottom:6px;}
+.panel-mpa-name{font-size:15px;font-weight:700;color:var(--navy);line-height:1.25;}
+.panel-mpa-sub{font-size:10px;color:var(--slate);margin-top:3px;}
+.panel-score-row{display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid var(--line);}
+.panel-score-num{font-size:36px;font-weight:700;color:var(--gold);line-height:1;}
+.panel-score-meta{flex:1;}
+.pill{padding:3px 9px;border-radius:12px;font-size:8.5px;font-weight:700;letter-spacing:0.8px;text-transform:uppercase;display:inline-block;margin-bottom:4px;}
+.pill-moderate{background:rgba(200,149,42,0.15);color:#A87418;border:1px solid var(--gold);}
+.pill-high{background:rgba(212,102,10,0.15);color:var(--orange);border:1px solid var(--orange);}
+.pill-critical{background:rgba(192,57,43,0.15);color:var(--red);border:1px solid var(--red);}
+.pill-low{background:rgba(26,107,60,0.15);color:var(--green);border:1px solid var(--green);}
+.pill-nodata{background:rgba(90,107,122,0.12);color:var(--slate);border:1px solid var(--line);}
+.panel-score-updated{font-size:9px;color:var(--slate);}
+.panel-section{padding:14px 20px;border-bottom:1px solid var(--line);}
+.panel-section-title{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--slate);font-weight:700;margin-bottom:8px;}
+.panel-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.panel-stat{background:var(--ice);border-radius:6px;padding:8px 10px;}
+.panel-stat-val{font-size:14px;font-weight:700;color:var(--navy);}
+.panel-stat-lbl{font-size:8.5px;color:var(--slate);text-transform:uppercase;letter-spacing:.5px;margin-top:1px;}
+.panel-note{font-size:10.5px;color:var(--slate);line-height:1.6;}
+.panel-cta{
+  display:block;text-align:center;margin:16px 20px 20px;
+  background:linear-gradient(90deg,var(--gold),var(--gold2));
+  color:var(--navy);font-weight:700;font-size:11px;letter-spacing:.5px;
+  text-transform:uppercase;text-decoration:none;padding:11px;border-radius:8px;
+}
+
+/* ── MAP MARKERS ──────────────────────────────────────────────── */
+.mpa-marker{
+  width:34px;height:34px;border-radius:50% 50% 50% 0;
+  transform:rotate(-45deg);
+  border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.4);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;
+}
+.mpa-marker span{transform:rotate(45deg);font-size:15px;}
+.mpa-marker.pulse::after{
+  content:'';position:absolute;top:-2px;left:-2px;right:-2px;bottom:-2px;
+  border-radius:50% 50% 50% 0;border:2px solid var(--red);
+  animation:markerpulse 1.6s infinite;
+}
+@keyframes markerpulse{0%{transform:scale(1);opacity:.8;}100%{transform:scale(1.6);opacity:0;}}
+
+.leaflet-popup-content-wrapper{background:var(--navy);color:#fff;border-radius:8px;}
+.leaflet-popup-tip{background:var(--navy);}
+.mp-popup-name{font-weight:700;font-size:12px;margin-bottom:2px;}
+.mp-popup-score{font-size:10px;color:var(--gold2);}
+
+/* ── PLACEHOLDER OVERLAY (for locked layers if toggled somehow) ── */
+.locked-toast{
+  position:absolute;bottom:20px;left:50%;transform:translateX(-50%);
+  background:var(--navy);color:#fff;padding:10px 18px;border-radius:8px;
+  font-size:11px;border:1px solid var(--gold);z-index:1000;
+  box-shadow:0 6px 20px rgba(0,0,0,0.4);display:none;max-width:420px;text-align:center;
+}
+.locked-toast.show{display:block;}
+
+@media(max-width:760px){
+  #side-panel{position:absolute;right:0;top:0;bottom:0;z-index:950;box-shadow:-8px 0 24px rgba(0,0,0,0.2);}
+  #side-panel.collapsed{margin-right:-320px;}
+  .layer-control{width:210px;}
+}
+</style>
+</head>
+<body>
+
+<div class="gold-bar"></div>
+<header>
+  <div class="header-inner">
+    <div>
+      <div class="brand-eye">StrataGuard Intelligence</div>
+      <div class="brand-title">National Overview — All Monitored Waters</div>
+      <div class="brand-motto">"Math Reacts to Reality"</div>
+    </div>
+    <div class="header-right">
+      <span class="live-badge"><span class="dot"></span>6 MPAs · 21 Zones</span>
+      <a href="#" class="back-link" onclick="return false;">← Zone Dashboard</a>
+    </div>
+  </div>
+</header>
+
+<div id="app">
+  <div id="map">
+    <div class="layer-control">
+      <div class="layer-control-title">Map Layers</div>
+
+      <div class="layer-row">
+        <button class="layer-toggle on" id="toggle-mpa" onclick="toggleLayer('mpa')"><span class="knob"></span></button>
+        <div class="layer-info">
+          <div class="layer-name">MPA Threat Zones</div>
+          <div class="layer-status live" id="status-mpa">● Live — Supabase</div>
+        </div>
+      </div>
+
+      <div class="layer-row">
+        <button class="layer-toggle" id="toggle-concessions" onclick="toggleLayer('concessions')"><span class="knob"></span></button>
+        <div class="layer-info">
+          <div class="layer-name">Foreign Yacht &amp; Commercial Concessions</div>
+          <div class="layer-status pending" id="status-concessions">◐ Awaiting DMR data</div>
+        </div>
+      </div>
+
+      <div class="layer-row">
+        <button class="layer-toggle locked" id="toggle-rbdf" onclick="toggleLayer('rbdf')"><span class="knob"></span></button>
+        <div class="layer-info">
+          <div class="layer-name">RBDF Fleet &amp; Assets Deployment</div>
+          <div class="layer-status locked" id="status-rbdf">◯ Requires RBDF MOU</div>
+        </div>
+      </div>
+
+      <div class="layer-row">
+        <button class="layer-toggle locked" id="toggle-sar" onclick="toggleLayer('sar')"><span class="knob"></span></button>
+        <div class="layer-info">
+          <div class="layer-name">Nighttime SAR / VIIRS</div>
+          <div class="layer-status locked" id="status-sar">◯ Requires institutional access</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="locked-toast" id="locked-toast"></div>
+  </div>
+
+  <div id="side-panel" class="collapsed">
+    <div id="panel-body">
+      <div class="panel-empty">
+        <div class="panel-empty-icon">🗺️</div>
+        <div class="panel-empty-text">Click any MPA marker on the map to view its current threat status, zone count, and coordinates.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+   SUPABASE — same placeholder-substitution pattern as the main
+   dashboard. Your build/deploy step already replaces these tokens.
+   ═══════════════════════════════════════════════════════════════ */
+const { createClient } = supabase;
+const _sb = createClient('https://xerep.github.io/strataguard/', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzcG5qZG10ZmNlem9tdnhjeWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2Mzc4MTEsImV4cCI6MjA5NzIxMzgxMX0.XElNTEJz7hc4H54YssQ0NvgNC7VifPSpT6Qlfi51JGs');
+
+/* ═══════════════════════════════════════════════════════════════
+   MPA REGISTRY — pulled from the same source of truth as the
+   Zone Dashboard (table names, centers, zone counts, icons)
+   ═══════════════════════════════════════════════════════════════ */
+const MPA_TABLES = {
+  'cay_sal_bank':    atob('Y2F5X3NhbF90aHJlYXRfbG9n'),
+  'andros':          atob('YW5kcm9zX3RocmVhdF9sb2c='),
+  'great_inagua':    atob('Z3JlYXRfaW5hZ3VhX3RocmVhdF9sb2c='),
+  'diamond_point':   atob('ZGlhbW9uZF9wb2ludF90aHJlYXRfbG9n'),
+  'jumentos_cays':   atob('anVtZW50b3NfdGhyZWF0X2xvZw=='),
+  'exuma_cays':      atob('ZXh1bWFfdGhyZWF0X2xvZw=='),
+};
+
+const MPA_META = {
+  'cay_sal_bank':    { name:'Cay Sal Bank',                      icon:'🐟', center:[23.90,-80.40], coords:'23.9°N · 80.4°W', zones:4 },
+  'andros':          { name:'Andros West Coast',                 icon:'🌊', center:[24.30,-78.10], coords:'24.3°N · 78.1°W', zones:6 },
+  'great_inagua':    { name:'Great Inagua MPA',                  icon:'🦞', center:[21.20,-73.20], coords:'21.2°N · 73.2°W', zones:3 },
+  'diamond_point':   { name:'Diamond Point — Great Bahama Bank', icon:'💎', center:[23.50,-77.80], coords:'23.5°N · 77.8°W', zones:2 },
+  'jumentos_cays':   { name:'Jumentos Cays',                     icon:'⛵', center:[22.80,-75.50], coords:'22.8°N · 75.5°W', zones:3 },
+  'exuma_cays':      { name:'Exuma Cays Land & Sea Park',        icon:'🪸', center:[23.70,-76.30], coords:'23.7°N · 76.3°W', zones:3 },
+};
+
+/* ═══════════════════════════════════════════════════════════════
+   LAYER 2 PRE-BUILD — Foreign Yacht & Commercial Concessions
+   ───────────────────────────────────────────────────────────────
+   Two feed paths, both wired, both currently empty by design:
+
+   PATH A — DMR institutional data (Option 2 from the outreach plan)
+     Reads from a `concession_records` Supabase table. Create it
+     whenever the DMR letter comes through:
+
+       create table concession_records (
+         id            uuid primary key default gen_random_uuid(),
+         mpa_id        text,          -- matches MPA_TABLES keys
+         lat           numeric,
+         lng           numeric,
+         holder_name   text,
+         concession_type text,        -- e.g. 'charter', 'foreign_fishing', 'commercial_lease'
+         permit_status text,          -- 'active' | 'expired' | 'pending'
+         source        text,          -- 'dmr_registry'
+         updated_at    timestamptz default now()
+       );
+
+     Nothing else in this file needs to change once that table has
+     rows — loadConcessionLayer() below already queries it.
+
+   PATH B — Manual compilation (Option 3), usable today, no
+     institutional access required. Add points as you compile them
+     from public sources (news, BREEF, published concession notices).
+     These render immediately alongside anything from Path A.
+   ═══════════════════════════════════════════════════════════════ */
+const MANUAL_CONCESSION_POINTS = [
+  // { lat: 24.30, lng: -78.10, name: 'Example Charter Operator', type: 'charter', source: 'public notice, [cite]' },
+];
+
+let concessionLayerGroup = null;
+
+async function loadConcessionLayer() {
+  const points = [...MANUAL_CONCESSION_POINTS];
+  try {
+    const { data, error } = await _sb
+      .from('concession_records')
+      .select('lat, lng, holder_name, concession_type, permit_status');
+    if (!error && data) {
+      data.forEach(r => points.push({
+        lat: r.lat, lng: r.lng, name: r.holder_name,
+        type: r.concession_type, source: 'DMR registry'
+      }));
+    }
+  } catch (e) {
+    // Table doesn't exist yet — expected until the DMR letter lands. Silent by design.
+  }
+
+  if (!concessionLayerGroup) concessionLayerGroup = L.layerGroup();
+  concessionLayerGroup.clearLayers();
+
+  const statusEl = document.getElementById('status-concessions');
+  if (points.length === 0) {
+    statusEl.textContent = '◐ Awaiting DMR data';
+    statusEl.className = 'layer-status pending';
+    return;
+  }
+
+  statusEl.textContent = '● ' + points.length + ' record' + (points.length === 1 ? '' : 's') + ' loaded';
+  statusEl.className = 'layer-status live';
+
+  points.forEach(p => {
+    const marker = L.circleMarker([p.lat, p.lng], {
+      radius: 7, color: '#E8B84B', weight: 2,
+      fillColor: '#C8952A', fillOpacity: 0.55
+    }).bindPopup(
+      '<div class="mp-popup-name">' + (p.name || 'Unnamed record') + '</div>' +
+      '<div class="mp-popup-score">' + (p.type || 'concession') + ' · ' + (p.source || 'manual') + '</div>'
+    );
+    concessionLayerGroup.addLayer(marker);
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LAYERS 3 & 4 — RBDF Fleet/Assets and SAR/VIIRS
+   ───────────────────────────────────────────────────────────────
+   Intentionally locked, not pre-populated with placeholder data.
+   Per the project's data-access notes: RBDF asset/position data
+   needs its own data-sharing agreement (a general DMR affiliation
+   letter does NOT cover it), and VIIRS near-real-time needs a
+   verified institutional tier (public VIIRS is 45-day delayed).
+
+   When either becomes available, the pattern is the same as
+   loadConcessionLayer() above: point it at the real source,
+   swap the toggle from locked -> live, remove the toast in
+   toggleLayer(). Left as stubs so wiring in real data later is a
+   config change, not a rebuild.
+   ═══════════════════════════════════════════════════════════════ */
+function loadRBDFLayer() {
+  // STUB — no data source available. See note above.
+}
+function loadSARLayer() {
+  // STUB — no data source available. See note above.
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   MAP INIT
+   ═══════════════════════════════════════════════════════════════ */
+let map, mpaLayerGroup;
+const mpaMarkers = {};
+
+function scoreTier(score) {
+  if (score === null || score === undefined) return { label: 'No Data', cls: 'pill-nodata', color: '#5A6B7A' };
+  if (score >= 75) return { label: 'Critical', cls: 'pill-critical', color: '#C0392B' };
+  if (score >= 50) return { label: 'High',     cls: 'pill-high',     color: '#D4660A' };
+  if (score >= 30) return { label: 'Moderate', cls: 'pill-moderate', color: '#C8952A' };
+  return { label: 'Low', cls: 'pill-low', color: '#1A6B3C' };
+}
+
+function buildMarkerIcon(icon, tierColor, isCritical) {
+  return L.divIcon({
+    className: '',
+    html: '<div class="mpa-marker' + (isCritical ? ' pulse' : '') + '" style="background:' + tierColor + ';position:relative;"><span>' + icon + '</span></div>',
+    iconSize: [34, 34],
+    iconAnchor: [17, 30]
+  });
+}
+
+async function initMap() {
+  map = L.map('map', { zoomControl: true, attributionControl: false }).setView([23.7, -76.5], 6.4);
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 12, minZoom: 5
+  }).addTo(map);
+
+  mpaLayerGroup = L.layerGroup().addTo(map);
+
+  for (const mpaId of Object.keys(MPA_META)) {
+    const meta = MPA_META[mpaId];
+    let score = null, tier = scoreTier(null), lastUpdated = null;
+
+    try {
+      const { data } = await _sb
+        .from(MPA_TABLES[mpaId])
+        .select('composite_score, run_date')
+        .order('run_date', { ascending: false })
+        .limit(1);
+      if (data && data.length > 0) {
+        score = data[0].composite_score;
+        lastUpdated = data[0].run_date;
+        tier = scoreTier(score);
+      }
+    } catch (e) {
+      // table/columns may not match in this environment — marker still renders, panel shows "No Data"
+    }
+
+    const icon = buildMarkerIcon(meta.icon, tier.color, tier.label === 'Critical');
+    const marker = L.marker(meta.center, { icon }).addTo(mpaLayerGroup);
+    marker.bindPopup(
+      '<div class="mp-popup-name">' + meta.name + '</div>' +
+      '<div class="mp-popup-score">' + (score !== null ? score + ' — ' + tier.label : 'No live data') + '</div>'
+    );
+    marker.on('click', () => openPanel(mpaId, score, tier, lastUpdated));
+    mpaMarkers[mpaId] = marker;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SIDE PANEL
+   ═══════════════════════════════════════════════════════════════ */
+function openPanel(mpaId, score, tier, lastUpdated) {
+  const meta = MPA_META[mpaId];
+  const panel = document.getElementById('side-panel');
+  const body = document.getElementById('panel-body');
+  panel.classList.remove('collapsed');
+
+  const updatedStr = lastUpdated
+    ? new Date(lastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+    : '—';
+
+  body.innerHTML =
+    '<div class="panel-header">' +
+      '<div class="panel-mpa-icon">' + meta.icon + '</div>' +
+      '<div class="panel-mpa-name">' + meta.name + '</div>' +
+      '<div class="panel-mpa-sub">' + meta.coords + '</div>' +
+    '</div>' +
+    '<div class="panel-score-row">' +
+      '<div class="panel-score-num">' + (score !== null ? score : '—') + '</div>' +
+      '<div class="panel-score-meta">' +
+        '<div class="pill ' + tier.cls + '">' + tier.label + '</div>' +
+        '<div class="panel-score-updated">Last run: ' + updatedStr + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="panel-section">' +
+      '<div class="panel-section-title">Zone Coverage</div>' +
+      '<div class="panel-stat-grid">' +
+        '<div class="panel-stat"><div class="panel-stat-val">' + meta.zones + '</div><div class="panel-stat-lbl">Monitored Zones</div></div>' +
+        '<div class="panel-stat"><div class="panel-stat-val">6:00 AM</div><div class="panel-stat-lbl">Nassau Brief Time</div></div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="panel-section">' +
+      '<div class="panel-section-title">About This Score</div>' +
+      '<div class="panel-note">Composite of 14 environmental and regulatory factors, refreshed daily at 6:00 AM Nassau time. Predicts conditions favorable to undetected illegal fishing — does not detect vessels directly.</div>' +
+    '</div>' +
+    '<a href="#" class="panel-cta" onclick="alert(\'Wire this to the Zone Dashboard URL for \' + \'' + meta.name + '\');return false;">View Full Zone Dashboard</a>';
+}
+
+function closePanel() {
+  document.getElementById('side-panel').classList.add('collapsed');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   LAYER TOGGLES
+   ═══════════════════════════════════════════════════════════════ */
+const layerState = { mpa: true, concessions: false, rbdf: false, sar: false };
+
+function showLockedToast(msg) {
+  const t = document.getElementById('locked-toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+function toggleLayer(key) {
+  if (key === 'rbdf') {
+    showLockedToast('🔒 RBDF Fleet & Assets requires a separate data-sharing agreement (MOU) with the Defence Force — not covered by a general DMR affiliation letter.');
+    return;
+  }
+  if (key === 'sar') {
+    showLockedToast('🔒 Nighttime SAR / VIIRS requires verified institutional access. Public VIIRS is delayed 45 days — not suitable for a live layer yet.');
+    return;
+  }
+
+  layerState[key] = !layerState[key];
+  const btn = document.getElementById('toggle-' + key);
+  btn.classList.toggle('on', layerState[key]);
+
+  if (key === 'mpa') {
+    if (layerState.mpa) mpaLayerGroup.addTo(map); else map.removeLayer(mpaLayerGroup);
+  }
+  if (key === 'concessions') {
+    if (!concessionLayerGroup) { loadConcessionLayer().then(() => { if (layerState.concessions) concessionLayerGroup.addTo(map); }); }
+    else if (layerState.concessions) { concessionLayerGroup.addTo(map); }
+    else { map.removeLayer(concessionLayerGroup); }
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INIT
+   ═══════════════════════════════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  initMap();
+  loadConcessionLayer(); // pre-load silently so the count is accurate the first time it's toggled on
+});
+</script>
+</body>
+</html>
