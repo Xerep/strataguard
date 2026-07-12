@@ -201,12 +201,8 @@ header{background:linear-gradient(135deg,var(--navy) 0%,var(--deep) 60%,var(--te
           </div>
 
           <div class="form-row">
-            <label class="form-label">Regulatory Season Status</label>
-            <div class="option-grid" id="season-options">
-              <div class="opt" data-value="in_season">In Season</div>
-              <div class="opt" data-value="closed_season">Closed Season</div>
-              <div class="opt" data-value="not_applicable">Not Applicable</div>
-            </div>
+            <label class="form-label">Regulatory Season Status (auto-calculated for today)</label>
+            <div id="season-status-display" style="background:var(--ice);border-radius:8px;padding:12px 14px;font-size:12px;line-height:2;"></div>
           </div>
 
           <div class="form-row">
@@ -338,8 +334,56 @@ const MPA_TABLES = {
 
 let currentUser = null;
 let selectedEncounter = null, selectedMatch = null, selectedPhoto = null;
-let selectedVisibility = null, selectedSea = null, selectedSeason = null;
+let selectedVisibility = null, selectedSea = null;
 let selectedVSize = null, selectedVActivity = null, selectedAIS = null, selectedSpecies = null, selectedGear = null;
+let computedSeasonSummary = '';
+
+/* ═══════════════════════════════════════════════════════════════
+   SEASON STATUS — computed automatically from today's date rather
+   than self-reported, since different species have different
+   windows and this shouldn't rely on an officer's memory of the
+   calendar. Dates verified against multiple Bahamian regulatory
+   sources as of July 2026:
+     Lobster (crawfish): closed April 1 – July 31
+     Nassau Grouper:     closed December 1 – end of February
+     Stone Crab:         closed June 1 – October 15
+     Queen Conch:        no confirmed current closed season —
+       sources disagree; shown as "Unconfirmed" rather than guessed
+   ═══════════════════════════════════════════════════════════════ */
+function isDateInRange(month, day, startMonth, startDay, endMonth, endDay) {
+  const d = month * 100 + day;
+  const start = startMonth * 100 + startDay;
+  const end = endMonth * 100 + endDay;
+  return start <= end ? (d >= start && d <= end) : (d >= start || d <= end);
+}
+
+function computeSeasonStatus() {
+  const now = new Date();
+  const m = now.getMonth() + 1, d = now.getDate();
+
+  const lobsterClosed = isDateInRange(m, d, 4, 1, 7, 31);
+  const grouperClosed = isDateInRange(m, d, 12, 1, 2, 28);
+  const crabClosed = isDateInRange(m, d, 6, 1, 10, 15);
+
+  return {
+    lobster: lobsterClosed ? 'Closed' : 'Open',
+    conch: 'Unconfirmed — sources disagree, verify locally',
+    grouper: grouperClosed ? 'Closed' : 'Open',
+    stone_crab: crabClosed ? 'Closed' : 'Open',
+  };
+}
+
+function renderSeasonStatus() {
+  const s = computeSeasonStatus();
+  const colorFor = v => v === 'Closed' ? 'var(--red)' : v === 'Open' ? 'var(--green)' : 'var(--orange)';
+  document.getElementById('season-status-display').innerHTML = `
+    🦞 Lobster: <strong style="color:${colorFor(s.lobster)};">${s.lobster}</strong><br>
+    🐚 Conch: <strong style="color:${colorFor(s.conch)};">${s.conch}</strong><br>
+    🐟 Nassau Grouper: <strong style="color:${colorFor(s.grouper)};">${s.grouper}</strong><br>
+    🦀 Stone Crab: <strong style="color:${colorFor(s.stone_crab)};">${s.stone_crab}</strong>
+  `;
+  computedSeasonSummary = `Lobster: ${s.lobster} | Conch: ${s.conch} | Grouper: ${s.grouper} | Stone Crab: ${s.stone_crab}`;
+}
 
 function wireOptionGroup(containerId, setter) {
   document.querySelectorAll('#' + containerId + ' .opt').forEach(el => {
@@ -398,6 +442,7 @@ async function handleLogin() {
   document.getElementById('main-content').style.display = 'block';
   document.getElementById('officer-name').textContent = officerRow.officer_name;
   document.getElementById('role-tag').textContent = officerRow.role;
+  renderSeasonStatus();
   if (officerRow.role === 'supervisor') {
     document.getElementById('tab-review').style.display = 'block';
     loadReviewQueue();
@@ -417,7 +462,6 @@ function switchTab(tab) {
 document.addEventListener('DOMContentLoaded', () => {
   wireOptionGroup('visibility-options', v => selectedVisibility = v);
   wireOptionGroup('sea-options', v => selectedSea = v);
-  wireOptionGroup('season-options', v => selectedSeason = v);
   wireOptionGroup('vsize-options', v => selectedVSize = v);
   wireOptionGroup('vactivity-options', v => selectedVActivity = v);
   wireOptionGroup('ais-options', v => selectedAIS = v);
@@ -518,7 +562,7 @@ async function submitEntry() {
     time_of_encounter: time,
     visibility: selectedVisibility,
     sea_conditions: selectedSea,
-    regulatory_season_status: selectedSeason,
+    regulatory_season_status: computedSeasonSummary,
     officers_present: officersPresent ? parseInt(officersPresent, 10) : null,
     vessel_size: selectedVSize,
     vessel_activity: selectedVActivity,
@@ -552,7 +596,7 @@ async function submitEntry() {
   document.querySelectorAll('.opt').forEach(e => e.classList.remove('selected'));
   document.querySelectorAll('.opt-yn').forEach(e => e.classList.remove('sel-yes', 'sel-no'));
   selectedEncounter = null; selectedMatch = null; selectedPhoto = null;
-  selectedVisibility = null; selectedSea = null; selectedSeason = null;
+  selectedVisibility = null; selectedSea = null;
   selectedVSize = null; selectedVActivity = null; selectedAIS = null; selectedSpecies = null; selectedGear = null;
 }
 
@@ -565,7 +609,7 @@ function renderDetails(row) {
   if (row.time_of_encounter) parts.push('🕐 ' + row.time_of_encounter);
   if (row.visibility) parts.push('👁 ' + humanize(row.visibility));
   if (row.sea_conditions) parts.push('🌊 ' + humanize(row.sea_conditions));
-  if (row.regulatory_season_status) parts.push('📋 ' + humanize(row.regulatory_season_status));
+  if (row.regulatory_season_status) parts.push('📋 ' + row.regulatory_season_status);
   if (row.officers_present) parts.push('👥 ' + row.officers_present + ' officer(s)');
   if (row.vessel_size) parts.push('🚤 ' + humanize(row.vessel_size));
   if (row.vessel_activity) parts.push('⚡ ' + humanize(row.vessel_activity));
@@ -679,7 +723,9 @@ async function openEditForm(logId) {
     </div>
     <div class="form-row"><label class="form-label">Visibility</label>${opts('visibility', ['clear', 'reduced', 'fog'], row.visibility)}</div>
     <div class="form-row"><label class="form-label">Sea Conditions</label>${opts('sea', ['calm', 'moderate', 'rough'], row.sea_conditions)}</div>
-    <div class="form-row"><label class="form-label">Regulatory Season</label>${opts('season', ['in_season', 'closed_season', 'not_applicable'], row.regulatory_season_status)}</div>
+    <div class="form-row"><label class="form-label">Regulatory Season Status</label>
+      <input class="form-select" type="text" id="edit-season-${logId}" value="${row.regulatory_season_status || ''}" placeholder="e.g. Lobster: Closed | Conch: Unconfirmed | Grouper: Open | Stone Crab: Open"/>
+    </div>
     <div class="form-row"><label class="form-label">Officers Present</label>
       <input class="form-select" type="number" id="edit-officers-${logId}" value="${row.officers_present || ''}"/>
     </div>
