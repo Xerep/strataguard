@@ -319,6 +319,7 @@ header{background:linear-gradient(135deg,var(--navy) 0%,var(--deep) 60%,var(--te
 <script>
 const { createClient } = supabase;
 const _sb = createClient('https://aspnjdmtfcezomvxcybk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzcG5qZG10ZmNlem9tdnhjeWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2Mzc4MTEsImV4cCI6MjA5NzIxMzgxMX0.XElNTEJz7hc4H54YssQ0NvgNC7VifPSpT6Qlfi51JGs');
+
 const ZONE_NAMES = {
   cay_sal_bank: 'Cay Sal Bank', andros: 'Andros West Coast', great_inagua: 'Great Inagua MPA',
   diamond_point: 'Diamond Point', jumentos_cays: 'Jumentos Cays', exuma_cays: 'Exuma Cays',
@@ -494,11 +495,11 @@ async function loadAlertsForZone() {
 
   try {
     const { data: scores } = await _sb.from(MPA_TABLES[zone])
-      .select('run_date, composite_score, threat_level')
+      .select('run_date, composite_score, composite_level')
       .gte('run_date', sevenDaysAgo).order('run_date', { ascending: false });
     (scores || []).forEach(s => options.push({
       type: 'zone_score', reference: zone + ':' + s.run_date,
-      summary: ZONE_NAMES[zone] + ' — ' + s.run_date + ' — Score ' + s.composite_score + ' (' + (s.threat_level || '') + ')',
+      summary: ZONE_NAMES[zone] + ' — ' + s.run_date + ' — Score ' + s.composite_score + ' (' + (s.composite_level || '') + ')',
     }));
   } catch (e) {}
 
