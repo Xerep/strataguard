@@ -580,21 +580,23 @@ function renderDetails(row) {
 
 async function loadHistory() {
   const container = document.getElementById('history-list');
-  const { data, error } = await _sb.from('patrol_logs')
-    .select('*').order('submitted_at', { ascending: false }).limit(50);
+  let query = _sb.from('patrol_logs').select('*').order('submitted_at', { ascending: false }).limit(50);
+  if (!showDeleted) query = query.eq('deleted', false);
+  const { data, error } = await query;
 
   if (error || !data || data.length === 0) {
-    container.innerHTML = '<div class="empty-state">No patrol reports yet.</div>';
+    container.innerHTML = renderShowDeletedToggle() + '<div class="empty-state">No patrol reports yet.</div>';
     return;
   }
 
   const isSupervisor = currentUser.role === 'supervisor';
 
-  container.innerHTML = data.map(row => `
-    <div class="entry-card" id="entry-${row.id}">
+  container.innerHTML = renderShowDeletedToggle() + data.map(row => `
+    <div class="entry-card" id="entry-${row.id}" style="${row.deleted ? 'opacity:0.55;' : ''}">
       <div class="entry-top">
         <div class="entry-alert">${row.alert_summary}</div>
         <span class="pill ${row.status === 'confirmed_locked' ? 'pill-locked' : 'pill-pending'}">${row.status === 'confirmed_locked' ? 'Locked' : 'Pending'}</span>
+        ${row.deleted ? '<span class="pill pill-interdiction">Hidden</span>' : ''}
       </div>
       <div class="entry-meta">${row.submitted_by_name} · ${new Date(row.submitted_at).toLocaleString()}</div>
       <div style="margin-top:8px;"><span class="pill ${pillClass(row.encounter_type)}">${pillLabel(row.encounter_type)}</span>
@@ -602,14 +604,26 @@ async function loadHistory() {
       </div>
       ${row.notes ? `<div class="entry-notes">${row.notes}</div>` : ''}
       ${renderDetails(row)}
+      ${row.deleted ? `<div style="font-size:10.5px;color:var(--red);margin-top:6px;">Hidden by ${row.deleted_by_name} on ${new Date(row.deleted_at).toLocaleString()}</div>` : ''}
       <div class="entry-actions">
-        ${isSupervisor ? `<button class="btn-small btn-edit" onclick="openEditForm('${row.id}')">Edit</button>` : ''}
+        ${isSupervisor && !row.deleted ? `<button class="btn-small btn-edit" onclick="openEditForm('${row.id}')">Edit</button>` : ''}
+        ${isSupervisor && !row.deleted ? `<button class="btn-small" style="background:rgba(192,57,43,0.12);color:var(--red);" onclick="softDeleteReport('${row.id}')">Hide (Soft Delete)</button>` : ''}
+        ${isSupervisor && row.deleted ? `<button class="btn-small btn-confirm" onclick="restoreReport('${row.id}')">Restore</button>` : ''}
         <button class="btn-small btn-edit" onclick="toggleEditHistory('${row.id}')">View Edit History</button>
       </div>
       <div id="edit-history-${row.id}" style="display:none;"></div>
       <div id="edit-form-${row.id}" class="edit-panel"></div>
     </div>
   `).join('');
+}
+
+function renderShowDeletedToggle() {
+  if (currentUser.role !== 'supervisor') return '';
+  return `<div style="margin-bottom:12px;">
+    <label style="font-size:11px;color:var(--slate);cursor:pointer;">
+      <input type="checkbox" ${showDeleted ? 'checked' : ''} onchange="toggleShowDeleted()"/> Show hidden reports
+    </label>
+  </div>`;
 }
 
 /* ── Edit history — always viewable by anyone, shows date/time + who ──── */
@@ -643,7 +657,11 @@ async function openEditForm(logId) {
   const { data: row, error } = await _sb.from('patrol_logs').select('*').eq('id', logId).single();
   if (error || !row) { alert('Could not load report for editing.'); return; }
 
-  const encounterOpts = ['nothing_observed', 'vessel_sighted', 'interdiction', 'other'];
+  const opts = (name, values, current) => `
+    <select class="form-select" id="edit-${name}-${logId}">
+      <option value="">—</option>
+      ${values.map(v => `<option value="${v}" ${current === v ? 'selected' : ''}>${humanize(v)}</option>`).join('')}
+    </select>`;
   const yesNoSelect = (name, current) => `
     <select class="form-select" id="edit-${name}-${logId}">
       <option value="">—</option>
@@ -653,11 +671,27 @@ async function openEditForm(logId) {
 
   formEl.innerHTML = `
     <div class="form-row"><label class="form-label">What was found</label>
-      <select class="form-select" id="edit-encounter-${logId}">
-        ${encounterOpts.map(o => `<option value="${o}" ${row.encounter_type === o ? 'selected' : ''}>${humanize(o)}</option>`).join('')}
-      </select>
+      ${opts('encounter', ['nothing_observed', 'vessel_sighted', 'interdiction', 'other'], row.encounter_type)}
     </div>
     <div class="form-row"><label class="form-label">Matched Prediction</label>${yesNoSelect('matched', row.matched_prediction)}</div>
+    <div class="form-row"><label class="form-label">Time of Encounter</label>
+      <input class="form-select" type="time" id="edit-time-${logId}" value="${row.time_of_encounter || ''}"/>
+    </div>
+    <div class="form-row"><label class="form-label">Visibility</label>${opts('visibility', ['clear', 'reduced', 'fog'], row.visibility)}</div>
+    <div class="form-row"><label class="form-label">Sea Conditions</label>${opts('sea', ['calm', 'moderate', 'rough'], row.sea_conditions)}</div>
+    <div class="form-row"><label class="form-label">Regulatory Season</label>${opts('season', ['in_season', 'closed_season', 'not_applicable'], row.regulatory_season_status)}</div>
+    <div class="form-row"><label class="form-label">Officers Present</label>
+      <input class="form-select" type="number" id="edit-officers-${logId}" value="${row.officers_present || ''}"/>
+    </div>
+    <div class="form-row"><label class="form-label">Vessel Size</label>${opts('vsize', ['under_25ft', '25_50ft', 'over_50ft'], row.vessel_size)}</div>
+    <div class="form-row"><label class="form-label">Vessel Activity</label>${opts('vactivity', ['anchored', 'actively_fishing', 'underway', 'fled_on_approach'], row.vessel_activity)}</div>
+    <div class="form-row"><label class="form-label">AIS Broadcasting</label>${opts('ais', ['yes', 'no', 'unknown'], row.ais_broadcasting)}</div>
+    <div class="form-row"><label class="form-label">Species Observed</label>${opts('species', ['lobster', 'conch', 'grouper', 'multiple', 'not_applicable'], row.species_observed)}</div>
+    <div class="form-row"><label class="form-label">Gear Type</label>${opts('gear', ['legal_gear', 'illegal_gear', 'unknown'], row.gear_type)}</div>
+    <div class="form-row"><label class="form-label">GPS (lat, lon)</label>
+      <input class="form-select" type="text" id="edit-gps-${logId}" value="${row.gps_lat && row.gps_lon ? row.gps_lat + ', ' + row.gps_lon : ''}"/>
+    </div>
+    <div class="form-row"><label class="form-label">Photo/Video Evidence</label>${yesNoSelect('photo', row.photo_evidence)}</div>
     <div class="form-row"><label class="form-label">Notes</label>
       <textarea class="form-textarea" id="edit-notes-${logId}">${row.notes || ''}</textarea>
     </div>
@@ -671,19 +705,36 @@ async function openEditForm(logId) {
 }
 
 async function saveEdit(logId) {
-  const encounter = document.getElementById('edit-encounter-' + logId).value;
-  const matchedRaw = document.getElementById('edit-matched-' + logId).value;
-  const notes = document.getElementById('edit-notes-' + logId).value.trim();
-  const reason = document.getElementById('edit-reason-' + logId).value.trim();
-  const statusEl = document.getElementById('edit-status-' + logId);
+  const val = id => { const el = document.getElementById(id); return el && el.value !== '' ? el.value : null; };
+  const yn = id => { const v = val(id); return v === null ? null : v === 'true'; };
 
-  const matched = matchedRaw === '' ? null : matchedRaw === 'true';
+  const gpsRaw = val('edit-gps-' + logId);
+  let gpsLat = null, gpsLon = null;
+  if (gpsRaw && gpsRaw.includes(',')) {
+    const parts = gpsRaw.split(',').map(p => parseFloat(p.trim()));
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) { gpsLat = parts[0]; gpsLon = parts[1]; }
+  }
+
+  const statusEl = document.getElementById('edit-status-' + logId);
+  const reason = val('edit-reason-' + logId);
 
   const { error } = await _sb.from('patrol_logs').update({
-    encounter_type: encounter,
-    matched_prediction: matched,
-    notes: notes || null,
-    edit_reason: reason || null,
+    encounter_type: val('edit-encounter-' + logId),
+    matched_prediction: yn('edit-matched-' + logId),
+    time_of_encounter: val('edit-time-' + logId),
+    visibility: val('edit-visibility-' + logId),
+    sea_conditions: val('edit-sea-' + logId),
+    regulatory_season_status: val('edit-season-' + logId),
+    officers_present: val('edit-officers-' + logId) ? parseInt(val('edit-officers-' + logId), 10) : null,
+    vessel_size: val('edit-vsize-' + logId),
+    vessel_activity: val('edit-vactivity-' + logId),
+    ais_broadcasting: val('edit-ais-' + logId),
+    species_observed: val('edit-species-' + logId),
+    gear_type: val('edit-gear-' + logId),
+    gps_lat: gpsLat, gps_lon: gpsLon,
+    photo_evidence: yn('edit-photo-' + logId),
+    notes: val('edit-notes-' + logId),
+    edit_reason: reason,
   }).eq('id', logId);
 
   if (error) {
@@ -695,6 +746,39 @@ async function saveEdit(logId) {
   statusEl.textContent = '✓ Saved.';
   statusEl.className = 'status-msg success';
   setTimeout(() => loadHistory(), 800);
+}
+
+/* ── Soft delete — hidden, never destroyed, fully tracked ───────────── */
+async function softDeleteReport(logId) {
+  if (!confirm('Hide this report from the normal list? It will remain in the database and can be restored later — nothing is permanently destroyed.')) return;
+
+  const { error } = await _sb.from('patrol_logs').update({
+    deleted: true,
+    deleted_by_email: currentUser.email,
+    deleted_by_name: currentUser.officer_name,
+    deleted_at: new Date().toISOString(),
+  }).eq('id', logId);
+
+  if (error) { alert('Error: ' + error.message); return; }
+  loadHistory();
+}
+
+async function restoreReport(logId) {
+  const { error } = await _sb.from('patrol_logs').update({
+    deleted: false,
+    deleted_by_email: null,
+    deleted_by_name: null,
+    deleted_at: null,
+  }).eq('id', logId);
+
+  if (error) { alert('Error: ' + error.message); return; }
+  loadHistory();
+}
+
+let showDeleted = false;
+function toggleShowDeleted() {
+  showDeleted = !showDeleted;
+  loadHistory();
 }
 
 async function loadReviewQueue() {
