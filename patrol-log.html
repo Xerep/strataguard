@@ -178,12 +178,115 @@ header{background:linear-gradient(135deg,var(--navy) 0%,var(--deep) 60%,var(--te
           </div>
 
           <div class="form-row">
+            <label class="form-label">Time of Encounter</label>
+            <input class="form-select" type="time" id="entry-time"/>
+          </div>
+
+          <div class="form-row">
+            <label class="form-label">Visibility</label>
+            <div class="option-grid" id="visibility-options">
+              <div class="opt" data-value="clear">Clear</div>
+              <div class="opt" data-value="reduced">Reduced</div>
+              <div class="opt" data-value="fog">Fog</div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <label class="form-label">Sea / Wind Conditions</label>
+            <div class="option-grid" id="sea-options">
+              <div class="opt" data-value="calm">Calm</div>
+              <div class="opt" data-value="moderate">Moderate</div>
+              <div class="opt" data-value="rough">Rough</div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <label class="form-label">Regulatory Season Status</label>
+            <div class="option-grid" id="season-options">
+              <div class="opt" data-value="in_season">In Season</div>
+              <div class="opt" data-value="closed_season">Closed Season</div>
+              <div class="opt" data-value="not_applicable">Not Applicable</div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <label class="form-label">Officers Present</label>
+            <input class="form-select" type="number" id="entry-officers" min="1" placeholder="e.g. 2"/>
+          </div>
+
+          <div class="form-row">
             <label class="form-label">What did you find?</label>
             <div class="option-grid" id="encounter-options">
               <div class="opt" data-value="nothing_observed">Nothing Observed</div>
               <div class="opt" data-value="vessel_sighted">Vessel Sighted</div>
               <div class="opt" data-value="interdiction">Interdiction</div>
               <div class="opt" data-value="other">Other</div>
+            </div>
+          </div>
+
+          <div id="vessel-details" style="display:none;">
+            <div class="form-row">
+              <label class="form-label">Estimated Vessel Size</label>
+              <div class="option-grid" id="vsize-options">
+                <div class="opt" data-value="under_25ft">Under 25ft</div>
+                <div class="opt" data-value="25_50ft">25–50ft</div>
+                <div class="opt" data-value="over_50ft">Over 50ft</div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <label class="form-label">Vessel Activity</label>
+              <div class="option-grid" id="vactivity-options">
+                <div class="opt" data-value="anchored">Anchored</div>
+                <div class="opt" data-value="actively_fishing">Actively Fishing</div>
+                <div class="opt" data-value="underway">Underway</div>
+                <div class="opt" data-value="fled_on_approach">Fled on Approach</div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <label class="form-label">Was the vessel broadcasting AIS?</label>
+              <div class="option-grid" id="ais-options">
+                <div class="opt" data-value="yes">Yes</div>
+                <div class="opt" data-value="no">No</div>
+                <div class="opt" data-value="unknown">Unknown</div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <label class="form-label">Species Observed</label>
+              <div class="option-grid" id="species-options">
+                <div class="opt" data-value="lobster">Lobster</div>
+                <div class="opt" data-value="conch">Conch</div>
+                <div class="opt" data-value="grouper">Grouper</div>
+                <div class="opt" data-value="multiple">Multiple</div>
+                <div class="opt" data-value="not_applicable">Not Applicable</div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <label class="form-label">Gear Type Observed</label>
+              <div class="option-grid" id="gear-options">
+                <div class="opt" data-value="legal_gear">Legal Gear</div>
+                <div class="opt" data-value="illegal_gear">Illegal Gear</div>
+                <div class="opt" data-value="unknown">Unknown</div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <label class="form-label">GPS Coordinates</label>
+              <div style="display:flex;gap:8px;">
+                <input class="form-select" type="text" id="entry-gps" placeholder="Tap button to capture, or type manually" readonly/>
+                <button type="button" class="btn-small btn-confirm" style="flex-shrink:0;" onclick="captureGPS()">📍 Capture</button>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <label class="form-label">Photo/Video Evidence Captured?</label>
+              <div class="yn-row" id="photo-toggle">
+                <button class="opt-yn" data-value="true">Yes</button>
+                <button class="opt-yn" data-value="false">No</button>
+              </div>
             </div>
           </div>
 
@@ -220,7 +323,6 @@ header{background:linear-gradient(135deg,var(--navy) 0%,var(--deep) 60%,var(--te
 <script>
 const { createClient } = supabase;
 const _sb = createClient('https://aspnjdmtfcezomvxcybk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzcG5qZG10ZmNlem9tdnhjeWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2Mzc4MTEsImV4cCI6MjA5NzIxMzgxMX0.XElNTEJz7hc4H54YssQ0NvgNC7VifPSpT6Qlfi51JGs');
-
 const ZONE_NAMES = {
   cay_sal_bank: 'Cay Sal Bank', andros: 'Andros West Coast', great_inagua: 'Great Inagua MPA',
   diamond_point: 'Diamond Point', jumentos_cays: 'Jumentos Cays', exuma_cays: 'Exuma Cays',
@@ -235,7 +337,38 @@ const MPA_TABLES = {
 };
 
 let currentUser = null;
-let selectedEncounter = null, selectedMatch = null;
+let selectedEncounter = null, selectedMatch = null, selectedPhoto = null;
+let selectedVisibility = null, selectedSea = null, selectedSeason = null;
+let selectedVSize = null, selectedVActivity = null, selectedAIS = null, selectedSpecies = null, selectedGear = null;
+
+function wireOptionGroup(containerId, setter) {
+  document.querySelectorAll('#' + containerId + ' .opt').forEach(el => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('#' + containerId + ' .opt').forEach(e => e.classList.remove('selected'));
+      el.classList.add('selected');
+      setter(el.dataset.value);
+    });
+  });
+}
+function wireYesNoGroup(containerId, setter) {
+  document.querySelectorAll('#' + containerId + ' .opt-yn').forEach(el => {
+    el.addEventListener('click', () => {
+      document.querySelectorAll('#' + containerId + ' .opt-yn').forEach(e => e.classList.remove('sel-yes', 'sel-no'));
+      el.classList.add(el.dataset.value === 'true' ? 'sel-yes' : 'sel-no');
+      setter(el.dataset.value === 'true');
+    });
+  });
+}
+
+function captureGPS() {
+  const input = document.getElementById('entry-gps');
+  if (!navigator.geolocation) { input.value = 'Not supported on this device'; return; }
+  input.value = 'Capturing...';
+  navigator.geolocation.getCurrentPosition(
+    pos => { input.value = pos.coords.latitude.toFixed(5) + ', ' + pos.coords.longitude.toFixed(5); },
+    err => { input.value = 'Could not capture — check location permission'; }
+  );
+}
 
 async function handleLogin() {
   const email = document.getElementById('login-email').value.trim();
@@ -282,19 +415,26 @@ function switchTab(tab) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+  wireOptionGroup('visibility-options', v => selectedVisibility = v);
+  wireOptionGroup('sea-options', v => selectedSea = v);
+  wireOptionGroup('season-options', v => selectedSeason = v);
+  wireOptionGroup('vsize-options', v => selectedVSize = v);
+  wireOptionGroup('vactivity-options', v => selectedVActivity = v);
+  wireOptionGroup('ais-options', v => selectedAIS = v);
+  wireOptionGroup('species-options', v => selectedSpecies = v);
+  wireOptionGroup('gear-options', v => selectedGear = v);
+  wireYesNoGroup('match-toggle', v => selectedMatch = v);
+  wireYesNoGroup('photo-toggle', v => selectedPhoto = v);
+
   document.querySelectorAll('#encounter-options .opt').forEach(el => {
     el.addEventListener('click', () => {
       document.querySelectorAll('#encounter-options .opt').forEach(e => e.classList.remove('selected'));
       el.classList.add('selected'); selectedEncounter = el.dataset.value;
+      const showVesselDetails = (selectedEncounter === 'vessel_sighted' || selectedEncounter === 'interdiction');
+      document.getElementById('vessel-details').style.display = showVesselDetails ? 'block' : 'none';
     });
   });
-  document.querySelectorAll('#match-toggle .opt-yn').forEach(el => {
-    el.addEventListener('click', () => {
-      document.querySelectorAll('#match-toggle .opt-yn').forEach(e => e.classList.remove('sel-yes', 'sel-no'));
-      el.classList.add(el.dataset.value === 'true' ? 'sel-yes' : 'sel-no');
-      selectedMatch = el.dataset.value === 'true';
-    });
-  });
+
   document.getElementById('login-password').addEventListener('keypress', e => { if (e.key === 'Enter') handleLogin(); });
 });
 
@@ -341,6 +481,9 @@ async function loadAlertsForZone() {
 async function submitEntry() {
   const zone = document.getElementById('entry-zone').value;
   const notes = document.getElementById('entry-notes').value.trim();
+  const time = document.getElementById('entry-time').value || null;
+  const officersPresent = document.getElementById('entry-officers').value || null;
+  const gpsRaw = document.getElementById('entry-gps').value.trim();
   const statusEl = document.getElementById('submit-status');
   const btn = document.getElementById('submit-btn');
 
@@ -352,6 +495,12 @@ async function submitEntry() {
   const alertSelect = document.getElementById('entry-alert');
   const options = JSON.parse(alertSelect.dataset.options || '[]');
   const chosen = options[alertSelect.value] || { type: 'zone_score', reference: zone + ':general', summary: ZONE_NAMES[zone] + ' — general report, no specific alert' };
+
+  let gpsLat = null, gpsLon = null;
+  if (gpsRaw && gpsRaw.includes(',') && !gpsRaw.includes('Capturing') && !gpsRaw.includes('Could not')) {
+    const parts = gpsRaw.split(',').map(p => parseFloat(p.trim()));
+    if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) { gpsLat = parts[0]; gpsLon = parts[1]; }
+  }
 
   btn.disabled = true; btn.textContent = 'Submitting...';
 
@@ -366,6 +515,19 @@ async function submitEntry() {
     matched_prediction: selectedMatch,
     notes: notes || null,
     status: 'pending',
+    time_of_encounter: time,
+    visibility: selectedVisibility,
+    sea_conditions: selectedSea,
+    regulatory_season_status: selectedSeason,
+    officers_present: officersPresent ? parseInt(officersPresent, 10) : null,
+    vessel_size: selectedVSize,
+    vessel_activity: selectedVActivity,
+    ais_broadcasting: selectedAIS,
+    species_observed: selectedSpecies,
+    gear_type: selectedGear,
+    gps_lat: gpsLat,
+    gps_lon: gpsLon,
+    photo_evidence: selectedPhoto,
   });
 
   if (error) {
@@ -378,16 +540,43 @@ async function submitEntry() {
   statusEl.textContent = '✓ Report submitted — awaiting supervisor confirmation.';
   statusEl.className = 'status-msg success';
   btn.disabled = false; btn.textContent = 'Submit Report';
+
+  // Reset the whole form
   document.getElementById('entry-zone').value = '';
   document.getElementById('alert-row').style.display = 'none';
   document.getElementById('entry-notes').value = '';
-  document.querySelectorAll('#encounter-options .opt').forEach(e => e.classList.remove('selected'));
-  document.querySelectorAll('#match-toggle .opt-yn').forEach(e => e.classList.remove('sel-yes', 'sel-no'));
-  selectedEncounter = null; selectedMatch = null;
+  document.getElementById('entry-time').value = '';
+  document.getElementById('entry-officers').value = '';
+  document.getElementById('entry-gps').value = '';
+  document.getElementById('vessel-details').style.display = 'none';
+  document.querySelectorAll('.opt').forEach(e => e.classList.remove('selected'));
+  document.querySelectorAll('.opt-yn').forEach(e => e.classList.remove('sel-yes', 'sel-no'));
+  selectedEncounter = null; selectedMatch = null; selectedPhoto = null;
+  selectedVisibility = null; selectedSea = null; selectedSeason = null;
+  selectedVSize = null; selectedVActivity = null; selectedAIS = null; selectedSpecies = null; selectedGear = null;
 }
 
 function pillClass(type) { return { nothing_observed: 'pill-nothing', vessel_sighted: 'pill-sighted', interdiction: 'pill-interdiction', other: 'pill-other' }[type] || 'pill-other'; }
 function pillLabel(type) { return { nothing_observed: 'Nothing Observed', vessel_sighted: 'Vessel Sighted', interdiction: 'Interdiction', other: 'Other' }[type] || type; }
+function humanize(v) { return v ? String(v).replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) : null; }
+
+function renderDetails(row) {
+  const parts = [];
+  if (row.time_of_encounter) parts.push('🕐 ' + row.time_of_encounter);
+  if (row.visibility) parts.push('👁 ' + humanize(row.visibility));
+  if (row.sea_conditions) parts.push('🌊 ' + humanize(row.sea_conditions));
+  if (row.regulatory_season_status) parts.push('📋 ' + humanize(row.regulatory_season_status));
+  if (row.officers_present) parts.push('👥 ' + row.officers_present + ' officer(s)');
+  if (row.vessel_size) parts.push('🚤 ' + humanize(row.vessel_size));
+  if (row.vessel_activity) parts.push('⚡ ' + humanize(row.vessel_activity));
+  if (row.ais_broadcasting) parts.push('📡 AIS: ' + humanize(row.ais_broadcasting));
+  if (row.species_observed) parts.push('🐟 ' + humanize(row.species_observed));
+  if (row.gear_type) parts.push('🎣 ' + humanize(row.gear_type));
+  if (row.gps_lat && row.gps_lon) parts.push('📍 ' + row.gps_lat + ', ' + row.gps_lon);
+  if (row.photo_evidence === true) parts.push('📷 Evidence captured');
+  if (parts.length === 0) return '';
+  return '<div style="font-size:10.5px;color:var(--slate);margin-top:8px;line-height:1.8;">' + parts.join(' &nbsp;·&nbsp; ') + '</div>';
+}
 
 async function loadHistory() {
   const container = document.getElementById('history-list');
@@ -409,6 +598,7 @@ async function loadHistory() {
         ${row.matched_prediction === true ? ' <span style="color:var(--green);font-weight:700;">✓ Matched</span>' : row.matched_prediction === false ? ' <span style="color:var(--red);font-weight:700;">✗ Did not match</span>' : ''}
       </div>
       ${row.notes ? `<div class="entry-notes">${row.notes}</div>` : ''}
+      ${renderDetails(row)}
     </div>
   `).join('');
 }
@@ -435,6 +625,7 @@ async function loadReviewQueue() {
       <div class="entry-meta">${row.submitted_by_name} · ${new Date(row.submitted_at).toLocaleString()}</div>
       <div style="margin-top:8px;"><span class="pill ${pillClass(row.encounter_type)}">${pillLabel(row.encounter_type)}</span></div>
       ${row.notes ? `<div class="entry-notes">${row.notes}</div>` : ''}
+      ${renderDetails(row)}
       <div class="entry-actions">
         <button class="btn-small btn-confirm" onclick="confirmReport('${row.id}')">Confirm &amp; Lock</button>
       </div>
