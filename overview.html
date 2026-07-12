@@ -245,7 +245,7 @@ header::before{content:'';position:absolute;right:-60px;top:-60px;width:240px;he
     </div>
     <div class="header-right">
       <span class="live-badge"><span class="dot"></span>6 MPAs · 21 Zones</span>
-      <a href="#" class="back-link" onclick="return false;">← Zone Dashboard</a>
+      <a href="https://xerep.github.io/strataguard/" class="back-link">← Zone Dashboard</a>
     </div>
   </div>
 </header>
@@ -276,6 +276,13 @@ header::before{content:'';position:absolute;right:-60px;top:-60px;width:240px;he
         <div class="layer-info">
           <div class="layer-name">Foreign Yacht &amp; Commercial Concessions</div>
           <div class="layer-status pending" id="status-concessions">◐ Loading...</div>
+          <select id="vessel-days-filter" onchange="reloadVesselWindow()" style="margin-top:6px;font-size:9.5px;background:rgba(255,255,255,0.08);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:4px;padding:2px 6px;">
+            <option value="1">Last 24 hours</option>
+            <option value="3">Last 3 days</option>
+            <option value="7" selected>Last 7 days</option>
+            <option value="14">Last 14 days</option>
+            <option value="30">Last 30 days</option>
+          </select>
         </div>
       </div>
 
@@ -319,7 +326,6 @@ header::before{content:'';position:absolute;right:-60px;top:-60px;width:240px;he
    ═══════════════════════════════════════════════════════════════ */
 const { createClient } = supabase;
 const _sb = createClient('https://aspnjdmtfcezomvxcybk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzcG5qZG10ZmNlem9tdnhjeWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2Mzc4MTEsImV4cCI6MjA5NzIxMzgxMX0.XElNTEJz7hc4H54YssQ0NvgNC7VifPSpT6Qlfi51JGs');
-
 /* ═══════════════════════════════════════════════════════════════
    MPA REGISTRY — pulled from the same source of truth as the
    Zone Dashboard (table names, centers, zone counts, icons)
@@ -389,7 +395,8 @@ const MANUAL_CONCESSION_POINTS = [
    ═══════════════════════════════════════════════════════════════ */
 let concessionLayerGroup = null;
 
-async function loadConcessionLayer() {
+async function loadConcessionLayer(vesselDays) {
+  vesselDays = vesselDays || 7; // default rolling window, matches dark events
   const points = [...MANUAL_CONCESSION_POINTS];
   let vesselCount = 0, darkEventCount = 0;
 
@@ -407,28 +414,23 @@ async function loadConcessionLayer() {
     // Table doesn't exist yet — expected until the DMR letter lands. Silent by design.
   }
 
-  // Today's AIS vessel detections (most recent run_date on file)
+  // AIS vessel detections within the selected rolling window (default 7 days)
   try {
-    const { data: latestRun } = await _sb
+    const cutoff = new Date(Date.now() - vesselDays * 86400000).toISOString().split('T')[0];
+    const { data: vessels, error } = await _sb
       .from('ais_vessel_log')
-      .select('run_date')
-      .order('run_date', { ascending: false })
-      .limit(1);
-    if (latestRun && latestRun.length > 0) {
-      const { data: vessels, error } = await _sb
-        .from('ais_vessel_log')
-        .select('mmsi, vessel_name, flag, length_m, lat, lon, zone_id, ais_timestamp')
-        .eq('run_date', latestRun[0].run_date);
-      if (!error && vessels) {
-        vesselCount = vessels.length;
-        vessels.forEach(v => points.push({
-          lat: v.lat, lng: v.lon,
-          name: v.vessel_name + ' (' + v.flag + ')',
-          type: 'AIS vessel — ' + Math.round(v.length_m) + 'ft',
-          source: 'AIS detection · ' + latestRun[0].run_date,
-          kind: 'vessel'
-        }));
-      }
+      .select('mmsi, vessel_name, flag, length_m, lat, lon, zone_id, ais_timestamp, run_date')
+      .gte('run_date', cutoff)
+      .order('run_date', { ascending: false });
+    if (!error && vessels) {
+      vesselCount = vessels.length;
+      vessels.forEach(v => points.push({
+        lat: v.lat, lng: v.lon,
+        name: v.vessel_name + ' (' + v.flag + ')',
+        type: 'AIS vessel — ' + Math.round(v.length_m) + 'ft',
+        source: 'AIS detection · ' + v.run_date,
+        kind: 'vessel'
+      }));
     }
   } catch (e) {
     // ais_vessel_log not populated yet — silent, same pattern as concessions
@@ -800,6 +802,15 @@ async function handleLogin() {
   document.getElementById('app').classList.add('visible');
   initMap();
   loadConcessionLayer();
+}
+
+function reloadVesselWindow() {
+  const days = parseInt(document.getElementById('vessel-days-filter').value, 10);
+  loadConcessionLayer(days).then(() => {
+    // Re-add to map if the layer is currently toggled on, since loadConcessionLayer
+    // rebuilds concessionLayerGroup's contents but doesn't change its map attachment
+    if (layerState.concessions) concessionLayerGroup.addTo(map);
+  });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
