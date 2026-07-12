@@ -284,9 +284,14 @@ header{background:linear-gradient(135deg,var(--navy) 0%,var(--deep) 60%,var(--te
             </div>
 
             <div class="form-row">
+              <label class="form-label">Sub-Zone / Landmark (if known)</label>
+              <select class="form-select" id="entry-subzone"><option value="">— Select zone first —</option></select>
+            </div>
+
+            <div class="form-row">
               <label class="form-label">GPS Coordinates</label>
               <div style="display:flex;gap:8px;">
-                <input class="form-select" type="text" id="entry-gps" placeholder="Tap button to capture, or type manually" readonly/>
+                <input class="form-select" type="text" id="entry-gps" placeholder="Tap Capture, or type manually as lat, lon"/>
                 <button type="button" class="btn-small btn-confirm" style="flex-shrink:0;" onclick="captureGPS()">📍 Capture</button>
               </div>
             </div>
@@ -503,6 +508,7 @@ async function loadAlertsForZone() {
   const alertRow = document.getElementById('alert-row');
   const alertSelect = document.getElementById('entry-alert');
   alertSelect.innerHTML = '';
+  loadSubZonesForZone(zone); // fires in parallel, doesn't block the alert dropdown
   if (!zone) { alertRow.style.display = 'none'; return; }
 
   const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
@@ -545,8 +551,61 @@ async function loadAlertsForZone() {
   alertRow.style.display = 'block';
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   SUB-ZONE DISCOVERY — instead of hardcoding sub-zone names (which
+   we've only confirmed for Andros, and would be guessing for the
+   other 5), this pulls the zone's own most recent row and detects
+   every real "<name>_score" + "<name>_level" column pair present.
+   Self-adapting to whatever each zone's actual data structure is,
+   with zero hardcoded/guessed names.
+   ═══════════════════════════════════════════════════════════════ */
+async function loadSubZonesForZone(zone) {
+  const select = document.getElementById('entry-subzone');
+  select.innerHTML = '<option value="">Loading...</option>';
+
+  if (!zone) { select.innerHTML = '<option value="">— Select zone first —</option>'; return; }
+
+  try {
+    const { data, error } = await _sb.from(MPA_TABLES[zone]).select('*')
+      .order('run_date', { ascending: false }).limit(1);
+
+    if (error || !data || data.length === 0) {
+      select.innerHTML = '<option value="">No sub-zone data available</option>';
+      return;
+    }
+
+    const row = data[0];
+    const subZones = [];
+    const EXCLUDE_PREFIXES = ['priority_zone']; // this pairs with a name, not itself a sub-zone score
+
+    Object.keys(row).forEach(key => {
+      if (key.endsWith('_score') && row[key] !== null) {
+        const base = key.slice(0, -6); // strip "_score"
+        if (EXCLUDE_PREFIXES.includes(base)) return;
+        const levelKey = base + '_level';
+        if (row.hasOwnProperty(levelKey)) {
+          const label = base.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+          subZones.push({ name: label, score: row[key], level: row[levelKey] });
+        }
+      }
+    });
+
+    if (subZones.length === 0) {
+      select.innerHTML = '<option value="">No sub-zone breakdown for this zone</option>';
+      return;
+    }
+
+    select.innerHTML = '<option value="">— None / whole-zone report —</option>' +
+      subZones.map(sz => `<option value="${sz.name}">${sz.name} — ${sz.score} (${sz.level})</option>`).join('');
+  } catch (e) {
+    console.error('Sub-zone discovery failed for', zone, ':', e);
+    select.innerHTML = '<option value="">No sub-zone data available</option>';
+  }
+}
+
 async function submitEntry() {
   const zone = document.getElementById('entry-zone').value;
+  const subZone = document.getElementById('entry-subzone').value || null;
   const notes = document.getElementById('entry-notes').value.trim();
   const time = document.getElementById('entry-time').value || null;
   const officersPresent = document.getElementById('entry-officers').value || null;
@@ -575,6 +634,7 @@ async function submitEntry() {
     submitted_by_email: currentUser.email,
     submitted_by_name: currentUser.officer_name,
     zone_id: zone,
+    sub_zone: subZone,
     alert_type: chosen.type,
     alert_reference: String(chosen.reference),
     alert_summary: chosen.summary,
@@ -613,6 +673,7 @@ async function submitEntry() {
 
 function resetForm() {
   document.getElementById('entry-zone').value = '';
+  document.getElementById('entry-subzone').innerHTML = '<option value="">— Select zone first —</option>';
   document.getElementById('alert-row').style.display = 'none';
   document.getElementById('entry-notes').value = '';
   document.getElementById('entry-time').value = '';
@@ -644,6 +705,7 @@ function renderDetails(row) {
   if (row.ais_broadcasting) parts.push('📡 AIS: ' + humanize(row.ais_broadcasting));
   if (row.species_observed) parts.push('🐟 ' + humanize(row.species_observed));
   if (row.gear_type) parts.push('🎣 ' + humanize(row.gear_type));
+  if (row.sub_zone) parts.push('📌 ' + row.sub_zone);
   if (row.gps_lat && row.gps_lon) parts.push('📍 ' + row.gps_lat + ', ' + row.gps_lon);
   if (row.photo_evidence === true) parts.push('📷 Evidence captured');
   if (parts.length === 0) return '';
@@ -763,6 +825,9 @@ async function openEditForm(logId) {
     <div class="form-row"><label class="form-label">AIS Broadcasting</label>${opts('ais', ['yes', 'no', 'unknown'], row.ais_broadcasting)}</div>
     <div class="form-row"><label class="form-label">Species Observed</label>${opts('species', ['lobster', 'conch', 'grouper', 'multiple', 'not_applicable'], row.species_observed)}</div>
     <div class="form-row"><label class="form-label">Gear Type</label>${opts('gear', ['legal_gear', 'illegal_gear', 'unknown'], row.gear_type)}</div>
+    <div class="form-row"><label class="form-label">Sub-Zone / Landmark</label>
+      <input class="form-select" type="text" id="edit-subzone-${logId}" value="${row.sub_zone || ''}"/>
+    </div>
     <div class="form-row"><label class="form-label">GPS (lat, lon)</label>
       <input class="form-select" type="text" id="edit-gps-${logId}" value="${row.gps_lat && row.gps_lon ? row.gps_lat + ', ' + row.gps_lon : ''}"/>
     </div>
@@ -807,6 +872,7 @@ async function saveEdit(logId) {
     ais_broadcasting: val('edit-ais-' + logId),
     species_observed: val('edit-species-' + logId),
     gear_type: val('edit-gear-' + logId),
+    sub_zone: val('edit-subzone-' + logId),
     gps_lat: gpsLat, gps_lon: gpsLon,
     photo_evidence: yn('edit-photo-' + logId),
     notes: val('edit-notes-' + logId),
