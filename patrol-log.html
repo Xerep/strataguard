@@ -183,11 +183,12 @@ header{background:linear-gradient(135deg,var(--navy) 0%,var(--deep) 60%,var(--te
           </div>
 
           <div class="form-row">
-            <label class="form-label">Visibility</label>
-            <div class="option-grid" id="visibility-options">
-              <div class="opt" data-value="clear">Clear</div>
-              <div class="opt" data-value="reduced">Reduced</div>
-              <div class="opt" data-value="fog">Fog</div>
+            <label class="form-label">Visibility (Shipping Forecast Scale)</label>
+            <div class="option-grid" id="visibility-options" style="grid-template-columns:1fr;">
+              <div class="opt" data-value="good">Good (more than 5 nautical miles)</div>
+              <div class="opt" data-value="moderate">Moderate (2–5 nautical miles)</div>
+              <div class="opt" data-value="poor">Poor (1km – 2 nautical miles)</div>
+              <div class="opt" data-value="fog">Fog (less than 1km)</div>
             </div>
           </div>
 
@@ -313,6 +314,7 @@ header{background:linear-gradient(135deg,var(--navy) 0%,var(--deep) 60%,var(--te
           </div>
 
           <button class="submit-btn" id="submit-btn" onclick="submitEntry()">Submit Report</button>
+          <button class="submit-btn" style="background:var(--ice);color:var(--slate);border:1px solid var(--line);margin-top:8px;" onclick="resetForm()">Clear Form</button>
           <div class="status-msg" id="submit-status"></div>
         </div>
       </div>
@@ -331,7 +333,7 @@ header{background:linear-gradient(135deg,var(--navy) 0%,var(--deep) 60%,var(--te
 
 <script>
 const { createClient } = supabase;
-const _sb = createClient('https://aspnjdmtfcezomvxcybk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzcG5qZG10ZmNlem9tdnhjeWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2Mzc4MTEsImV4cCI6MjA5NzIxMzgxMX0.XElNTEJz7hc4H54YssQ0NvgNC7VifPSpT6Qlfi51JGs')
+const _sb = createClient('https://aspnjdmtfcezomvxcybk.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzcG5qZG10ZmNlem9tdnhjeWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2Mzc4MTEsImV4cCI6MjA5NzIxMzgxMX0.XElNTEJz7hc4H54YssQ0NvgNC7VifPSpT6Qlfi51JGs');
 const ZONE_NAMES = {
   cay_sal_bank: 'Cay Sal Bank', andros: 'Andros West Coast', great_inagua: 'Great Inagua MPA',
   diamond_point: 'Diamond Point', jumentos_cays: 'Jumentos Cays', exuma_cays: 'Exuma Cays',
@@ -507,24 +509,31 @@ async function loadAlertsForZone() {
   const options = [];
 
   try {
-    const { data: scores } = await _sb.from(MPA_TABLES[zone])
+    const { data: scores, error: scoresErr } = await _sb.from(MPA_TABLES[zone])
       .select('run_date, composite_score, composite_level')
       .gte('run_date', sevenDaysAgo).order('run_date', { ascending: false });
+    if (scoresErr) console.error('Zone score query error for', zone, ':', scoresErr);
+    console.log('Zone score results for', zone, ':', scores);
     (scores || []).forEach(s => options.push({
       type: 'zone_score', reference: zone + ':' + s.run_date,
       summary: ZONE_NAMES[zone] + ' — ' + s.run_date + ' — Score ' + s.composite_score + ' (' + (s.composite_level || '') + ')',
     }));
-  } catch (e) {}
+  } catch (e) {
+    console.error('Zone score query threw for', zone, ':', e);
+  }
 
   try {
-    const { data: events } = await _sb.from('ais_dark_events')
+    const { data: events, error: eventsErr } = await _sb.from('ais_dark_events')
       .select('id, vessel_name, detected_run_date')
       .eq('last_known_zone_id', zone).gte('detected_run_date', sevenDaysAgo);
+    if (eventsErr) console.error('Dark events query error for', zone, ':', eventsErr);
     (events || []).forEach(ev => options.push({
       type: 'dark_event', reference: ev.id,
       summary: ZONE_NAMES[zone] + ' — ' + ev.detected_run_date + ' — WENT DARK — ' + (ev.vessel_name || 'Unknown vessel'),
     }));
-  } catch (e) {}
+  } catch (e) {
+    console.error('Dark events query threw for', zone, ':', e);
+  }
 
   if (options.length === 0) {
     alertSelect.innerHTML = '<option value="">No recent alerts for this zone — general report</option>';
@@ -599,8 +608,10 @@ async function submitEntry() {
   statusEl.textContent = '✓ Report submitted — awaiting supervisor confirmation.';
   statusEl.className = 'status-msg success';
   btn.disabled = false; btn.textContent = 'Submit Report';
+  resetForm();
+}
 
-  // Reset the whole form
+function resetForm() {
   document.getElementById('entry-zone').value = '';
   document.getElementById('alert-row').style.display = 'none';
   document.getElementById('entry-notes').value = '';
@@ -613,6 +624,7 @@ async function submitEntry() {
   selectedEncounter = null; selectedMatch = null; selectedPhoto = null;
   selectedVisibility = null; selectedWind = null; selectedSeaState = null;
   selectedVSize = null; selectedVActivity = null; selectedAIS = null; selectedSpecies = null; selectedGear = null;
+  document.getElementById('submit-status').textContent = '';
 }
 
 function pillClass(type) { return { nothing_observed: 'pill-nothing', vessel_sighted: 'pill-sighted', interdiction: 'pill-interdiction', other: 'pill-other' }[type] || 'pill-other'; }
@@ -737,7 +749,7 @@ async function openEditForm(logId) {
     <div class="form-row"><label class="form-label">Time of Encounter</label>
       <input class="form-select" type="time" id="edit-time-${logId}" value="${row.time_of_encounter || ''}"/>
     </div>
-    <div class="form-row"><label class="form-label">Visibility</label>${opts('visibility', ['clear', 'reduced', 'fog'], row.visibility)}</div>
+    <div class="form-row"><label class="form-label">Visibility (Shipping Forecast Scale)</label>${opts('visibility', ['good', 'moderate', 'poor', 'fog'], row.visibility)}</div>
     <div class="form-row"><label class="form-label">Wind (Beaufort Scale)</label>${opts('wind', ['calm_light', 'light_gentle', 'moderate', 'fresh', 'strong_plus'], row.wind_conditions)}</div>
     <div class="form-row"><label class="form-label">Sea State (Douglas Scale)</label>${opts('sea', ['calm', 'smooth', 'slight', 'moderate', 'rough_plus'], row.sea_conditions)}</div>
     <div class="form-row"><label class="form-label">Regulatory Season Status</label>
