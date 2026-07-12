@@ -176,6 +176,17 @@ header::before{content:'';position:absolute;right:-60px;top:-60px;width:240px;he
 .mp-popup-score{font-size:10px;color:var(--gold2);}
 
 /* ── PLACEHOLDER OVERLAY (for locked layers if toggled somehow) ── */
+.basemap-toggle{
+  position:absolute;bottom:24px;left:14px;z-index:900;
+  background:rgba(27,42,74,0.94);backdrop-filter:blur(6px);
+  border:1px solid rgba(200,149,42,0.35);border-radius:8px;
+  padding:9px 14px;color:#fff;font-size:11px;font-weight:700;
+  cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.3);
+  transition:all .2s;
+}
+.basemap-toggle:hover{border-color:var(--gold);color:var(--gold2);}
+.basemap-toggle.satellite-active{background:rgba(200,149,42,0.25);border-color:var(--gold);}
+
 .locked-toast{
   position:absolute;bottom:20px;left:50%;transform:translateX(-50%);
   background:var(--navy);color:#fff;padding:10px 18px;border-radius:8px;
@@ -284,6 +295,8 @@ header::before{content:'';position:absolute;right:-60px;top:-60px;width:240px;he
         </div>
       </div>
     </div>
+
+    <button class="basemap-toggle" id="basemap-toggle" onclick="toggleBasemap()">🛰️ Satellite View</button>
 
     <div class="locked-toast" id="locked-toast"></div>
   </div>
@@ -555,9 +568,23 @@ function buildMarkerIcon(icon, tierColor, isCritical) {
 async function initMap() {
   map = L.map('map', { zoomControl: true, attributionControl: false }).setView([23.7, -76.5], 6.4);
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  // ── BASEMAPS ────────────────────────────────────────────────────
+  // Tactical: stylized dark map (default) — good for the dashboard aesthetic,
+  //   but depends on OpenStreetMap's coverage, which can be sparse for
+  //   tiny, largely uninhabited cays (Cay Sal, Cay Lobos, etc.)
+  // Satellite: real Esri World Imagery — shows the actual physical land
+  //   regardless of how well any map database has traced it, so small
+  //   cays are reliably visible. No API key required, free to use.
+  const tacticalLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     maxZoom: 18, minZoom: 5
-  }).addTo(map);
+  });
+  const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    maxZoom: 19, minZoom: 5, attribution: 'Imagery &copy; Esri'
+  });
+
+  tacticalLayer.addTo(map);
+  window._basemaps = { tactical: tacticalLayer, satellite: satelliteLayer };
+  window._activeBasemap = 'tactical';
 
   mpaLayerGroup = L.layerGroup().addTo(map);
 
@@ -633,6 +660,35 @@ function openPanel(mpaId, score, tier, lastUpdated) {
 
 function closePanel() {
   document.getElementById('side-panel').classList.add('collapsed');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   BASEMAP TOGGLE — tactical (stylized dark, OSM-based) vs
+   satellite (real Esri imagery). Satellite is the more reliable
+   view for spotting small, sparsely-mapped cays since it shows
+   actual photography rather than depending on OSM's coverage.
+   ═══════════════════════════════════════════════════════════════ */
+function toggleBasemap() {
+  const btn = document.getElementById('basemap-toggle');
+  const { tactical, satellite } = window._basemaps;
+
+  if (window._activeBasemap === 'tactical') {
+    map.removeLayer(tactical);
+    satellite.addTo(map);
+    // Satellite tiles render above data layers by default in Leaflet's
+    // stacking order — push it back down so markers stay visible on top.
+    satellite.bringToBack();
+    window._activeBasemap = 'satellite';
+    btn.textContent = '🗺️ Tactical View';
+    btn.classList.add('satellite-active');
+  } else {
+    map.removeLayer(satellite);
+    tactical.addTo(map);
+    tactical.bringToBack();
+    window._activeBasemap = 'tactical';
+    btn.textContent = '🛰️ Satellite View';
+    btn.classList.remove('satellite-active');
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
