@@ -587,8 +587,11 @@ async function loadHistory() {
     container.innerHTML = '<div class="empty-state">No patrol reports yet.</div>';
     return;
   }
+
+  const isSupervisor = currentUser.role === 'supervisor';
+
   container.innerHTML = data.map(row => `
-    <div class="entry-card">
+    <div class="entry-card" id="entry-${row.id}">
       <div class="entry-top">
         <div class="entry-alert">${row.alert_summary}</div>
         <span class="pill ${row.status === 'confirmed_locked' ? 'pill-locked' : 'pill-pending'}">${row.status === 'confirmed_locked' ? 'Locked' : 'Pending'}</span>
@@ -599,8 +602,99 @@ async function loadHistory() {
       </div>
       ${row.notes ? `<div class="entry-notes">${row.notes}</div>` : ''}
       ${renderDetails(row)}
+      <div class="entry-actions">
+        ${isSupervisor ? `<button class="btn-small btn-edit" onclick="openEditForm('${row.id}')">Edit</button>` : ''}
+        <button class="btn-small btn-edit" onclick="toggleEditHistory('${row.id}')">View Edit History</button>
+      </div>
+      <div id="edit-history-${row.id}" style="display:none;"></div>
+      <div id="edit-form-${row.id}" class="edit-panel"></div>
     </div>
   `).join('');
+}
+
+/* ── Edit history — always viewable by anyone, shows date/time + who ──── */
+async function toggleEditHistory(logId) {
+  const el = document.getElementById('edit-history-' + logId);
+  if (el.style.display === 'block') { el.style.display = 'none'; return; }
+
+  const { data, error } = await _sb.from('patrol_log_edits')
+    .select('*').eq('log_id', logId).order('edited_at', { ascending: false });
+
+  if (error || !data || data.length === 0) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--slate);margin-top:8px;padding:8px;background:var(--ice);border-radius:6px;">No edits recorded.</div>';
+  } else {
+    el.innerHTML = '<div style="margin-top:8px;background:var(--ice);border-radius:6px;padding:10px 12px;">' +
+      data.map(e => `
+        <div style="font-size:11px;padding:4px 0;border-bottom:1px solid var(--line);">
+          <strong>${humanize(e.field_changed)}</strong> changed by <strong>${e.edited_by_name || e.edited_by_email}</strong>
+          on ${new Date(e.edited_at).toLocaleString()}<br>
+          <span style="color:var(--red);">"${e.old_value ?? '(empty)'}"</span> → <span style="color:var(--green);">"${e.new_value ?? '(empty)'}"</span>
+        </div>
+      `).join('') + '</div>';
+  }
+  el.style.display = 'block';
+}
+
+/* ── Edit form — supervisors only, pre-filled with current values ──────── */
+async function openEditForm(logId) {
+  const formEl = document.getElementById('edit-form-' + logId);
+  if (formEl.classList.contains('show')) { formEl.classList.remove('show'); formEl.innerHTML = ''; return; }
+
+  const { data: row, error } = await _sb.from('patrol_logs').select('*').eq('id', logId).single();
+  if (error || !row) { alert('Could not load report for editing.'); return; }
+
+  const encounterOpts = ['nothing_observed', 'vessel_sighted', 'interdiction', 'other'];
+  const yesNoSelect = (name, current) => `
+    <select class="form-select" id="edit-${name}-${logId}">
+      <option value="">—</option>
+      <option value="true" ${current === true ? 'selected' : ''}>Yes</option>
+      <option value="false" ${current === false ? 'selected' : ''}>No</option>
+    </select>`;
+
+  formEl.innerHTML = `
+    <div class="form-row"><label class="form-label">What was found</label>
+      <select class="form-select" id="edit-encounter-${logId}">
+        ${encounterOpts.map(o => `<option value="${o}" ${row.encounter_type === o ? 'selected' : ''}>${humanize(o)}</option>`).join('')}
+      </select>
+    </div>
+    <div class="form-row"><label class="form-label">Matched Prediction</label>${yesNoSelect('matched', row.matched_prediction)}</div>
+    <div class="form-row"><label class="form-label">Notes</label>
+      <textarea class="form-textarea" id="edit-notes-${logId}">${row.notes || ''}</textarea>
+    </div>
+    <div class="form-row"><label class="form-label">Reason for edit (recommended)</label>
+      <input class="form-select" type="text" id="edit-reason-${logId}" placeholder="e.g. corrected typo in notes"/>
+    </div>
+    <button class="btn-small btn-confirm" onclick="saveEdit('${logId}')">Save Changes</button>
+    <div class="status-msg" id="edit-status-${logId}"></div>
+  `;
+  formEl.classList.add('show');
+}
+
+async function saveEdit(logId) {
+  const encounter = document.getElementById('edit-encounter-' + logId).value;
+  const matchedRaw = document.getElementById('edit-matched-' + logId).value;
+  const notes = document.getElementById('edit-notes-' + logId).value.trim();
+  const reason = document.getElementById('edit-reason-' + logId).value.trim();
+  const statusEl = document.getElementById('edit-status-' + logId);
+
+  const matched = matchedRaw === '' ? null : matchedRaw === 'true';
+
+  const { error } = await _sb.from('patrol_logs').update({
+    encounter_type: encounter,
+    matched_prediction: matched,
+    notes: notes || null,
+    edit_reason: reason || null,
+  }).eq('id', logId);
+
+  if (error) {
+    statusEl.textContent = 'Error: ' + error.message;
+    statusEl.className = 'status-msg error';
+    return;
+  }
+
+  statusEl.textContent = '✓ Saved.';
+  statusEl.className = 'status-msg success';
+  setTimeout(() => loadHistory(), 800);
 }
 
 async function loadReviewQueue() {
