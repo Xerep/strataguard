@@ -569,6 +569,8 @@ async function loadSubZonesForZone(zone) {
     const { data, error } = await _sb.from(MPA_TABLES[zone]).select('*')
       .order('run_date', { ascending: false }).limit(1);
 
+    console.log('Sub-zone raw query for', zone, '- error:', error, 'data:', data);
+
     if (error || !data || data.length === 0) {
       select.innerHTML = '<option value="">No sub-zone data available</option>';
       return;
@@ -576,7 +578,7 @@ async function loadSubZonesForZone(zone) {
 
     const row = data[0];
     const subZones = [];
-    const EXCLUDE_PREFIXES = ['priority_zone']; // this pairs with a name, not itself a sub-zone score
+    const EXCLUDE_PREFIXES = ['priority_zone', 'composite']; // whole-zone summary fields, not sub-zones
 
     Object.keys(row).forEach(key => {
       if (key.endsWith('_score') && row[key] !== null) {
@@ -590,6 +592,8 @@ async function loadSubZonesForZone(zone) {
       }
     });
 
+    console.log('Sub-zones discovered for', zone, ':', subZones);
+
     if (subZones.length === 0) {
       select.innerHTML = '<option value="">No sub-zone breakdown for this zone</option>';
       return;
@@ -598,7 +602,7 @@ async function loadSubZonesForZone(zone) {
     select.innerHTML = '<option value="">— None / whole-zone report —</option>' +
       subZones.map(sz => `<option value="${sz.name}">${sz.name} — ${sz.score} (${sz.level})</option>`).join('');
   } catch (e) {
-    console.error('Sub-zone discovery failed for', zone, ':', e);
+    console.error('Sub-zone discovery threw for', zone, ':', e);
     select.innerHTML = '<option value="">No sub-zone data available</option>';
   }
 }
