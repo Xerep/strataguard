@@ -178,6 +178,14 @@ header{background:linear-gradient(135deg,var(--navy) 0%,var(--deep) 60%,var(--te
           </div>
 
           <div class="form-row">
+            <label class="form-label">Was this patrol prompted by an elevated alert, or a routine/control check?</label>
+            <div class="option-grid" id="patrol-type-options">
+              <div class="opt" data-value="alert_response">Alert Response</div>
+              <div class="opt" data-value="routine_control">Routine / Control Check</div>
+            </div>
+          </div>
+
+          <div class="form-row">
             <label class="form-label">Time of Encounter</label>
             <input class="form-select" type="time" id="entry-time"/>
           </div>
@@ -354,7 +362,7 @@ const MPA_TABLES = {
 
 let currentUser = null;
 let selectedEncounter = null, selectedMatch = null, selectedPhoto = null;
-let selectedVisibility = null, selectedWind = null, selectedSeaState = null;
+let selectedVisibility = null, selectedWind = null, selectedSeaState = null, selectedPatrolType = null;
 let selectedVSize = null, selectedVActivity = null, selectedAIS = null, selectedSpecies = null, selectedGear = null;
 let computedSeasonSummary = '';
 
@@ -481,6 +489,7 @@ function switchTab(tab) {
 
 document.addEventListener('DOMContentLoaded', () => {
   wireOptionGroup('visibility-options', v => selectedVisibility = v);
+  wireOptionGroup('patrol-type-options', v => selectedPatrolType = v);
   wireOptionGroup('wind-options', v => selectedWind = v);
   wireOptionGroup('seastate-options', v => selectedSeaState = v);
   wireOptionGroup('vsize-options', v => selectedVSize = v);
@@ -639,6 +648,7 @@ async function submitEntry() {
     submitted_by_name: currentUser.officer_name,
     zone_id: zone,
     sub_zone: subZone,
+    patrol_type: selectedPatrolType,
     alert_type: chosen.type,
     alert_reference: String(chosen.reference),
     alert_summary: chosen.summary,
@@ -687,7 +697,7 @@ function resetForm() {
   document.querySelectorAll('.opt').forEach(e => e.classList.remove('selected'));
   document.querySelectorAll('.opt-yn').forEach(e => e.classList.remove('sel-yes', 'sel-no'));
   selectedEncounter = null; selectedMatch = null; selectedPhoto = null;
-  selectedVisibility = null; selectedWind = null; selectedSeaState = null;
+  selectedVisibility = null; selectedWind = null; selectedSeaState = null; selectedPatrolType = null;
   selectedVSize = null; selectedVActivity = null; selectedAIS = null; selectedSpecies = null; selectedGear = null;
   document.getElementById('submit-status').textContent = '';
 }
@@ -709,6 +719,7 @@ function renderDetails(row) {
   if (row.ais_broadcasting) parts.push('📡 AIS: ' + humanize(row.ais_broadcasting));
   if (row.species_observed) parts.push('🐟 ' + humanize(row.species_observed));
   if (row.gear_type) parts.push('🎣 ' + humanize(row.gear_type));
+  if (row.patrol_type) parts.push((row.patrol_type === 'routine_control' ? '🎯 Control Check' : '🚨 Alert Response'));
   if (row.sub_zone) parts.push('📌 ' + row.sub_zone);
   if (row.gps_lat && row.gps_lon) parts.push('📍 ' + row.gps_lat + ', ' + row.gps_lon);
   if (row.photo_evidence === true) parts.push('📷 Evidence captured');
@@ -811,6 +822,7 @@ async function openEditForm(logId) {
     <div class="form-row"><label class="form-label">What was found</label>
       ${opts('encounter', ['nothing_observed', 'vessel_sighted', 'interdiction', 'other'], row.encounter_type)}
     </div>
+    <div class="form-row"><label class="form-label">Patrol Type</label>${opts('patroltype', ['alert_response', 'routine_control'], row.patrol_type)}</div>
     <div class="form-row"><label class="form-label">Matched Prediction</label>${yesNoSelect('matched', row.matched_prediction)}</div>
     <div class="form-row"><label class="form-label">Time of Encounter</label>
       <input class="form-select" type="time" id="edit-time-${logId}" value="${row.time_of_encounter || ''}"/>
@@ -877,6 +889,7 @@ async function saveEdit(logId) {
     species_observed: val('edit-species-' + logId),
     gear_type: val('edit-gear-' + logId),
     sub_zone: val('edit-subzone-' + logId),
+    patrol_type: val('edit-patroltype-' + logId),
     gps_lat: gpsLat, gps_lon: gpsLon,
     photo_evidence: yn('edit-photo-' + logId),
     notes: val('edit-notes-' + logId),
