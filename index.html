@@ -554,8 +554,9 @@ footer{background:var(--navy);color:#9FD3E8;padding:9px 28px;font-size:7.5px;dis
 // Store secrets in: GitHub repo -> Settings -> Secrets and variables -> Actions
 const { createClient } = supabase;
 const _sb = createClient(
-  const _sb = createClient('https://aspnjdmtfcezomvxcybk.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzcG5qZG10ZmNlem9tdnhjeWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2Mzc4MTEsImV4cCI6MjA5NzIxMzgxMX0.XElNTEJz7hc4H54YssQ0NvgNC7VifPSpT6Qlfi51JGs');
+  'https://aspnjdmtfcezomvxcybk.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzcG5qZG10ZmNlem9tdnhjeWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2Mzc4MTEsImV4cCI6MjA5NzIxMzgxMX0.XElNTEJz7hc4H54YssQ0NvgNC7VifPSpT6Qlfi51JGs'
+);
 
 // ── DATA API HELPER — direct Supabase queries (GitHub Pages deployment) ────
 async function api(action, params = {}) {
