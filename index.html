@@ -316,7 +316,6 @@ footer{background:var(--navy);color:#9FD3E8;padding:9px 28px;font-size:7.5px;dis
       <div class="brand-sub"><span id="hdr-zone-count">4</span>-Zone Real-Time Coverage &nbsp;·&nbsp; Brief: <span id="hdr-date">—</span> &nbsp;·&nbsp; <span id="hdr-time">—</span></div>
     </div>
     <div class="header-right">
-      <a href="overview.html" style="font-size:9px;color:#9FD3E8;text-decoration:none;border:1px solid rgba(255,255,255,0.2);padding:6px 12px;border-radius:6px;transition:all .2s;white-space:nowrap;" onmouseover="this.style.borderColor='#C8952A';this.style.color='#E8B84B';" onmouseout="this.style.borderColor='rgba(255,255,255,0.2)';this.style.color='#9FD3E8';">🗺️ National Overview</a>
       <div class="priority-box">
         <div class="priority-lbl">Priority Zone</div>
         <div class="priority-name" id="hdr-priority-name">—</div>
@@ -555,9 +554,8 @@ footer{background:var(--navy);color:#9FD3E8;padding:9px 28px;font-size:7.5px;dis
 // Store secrets in: GitHub repo -> Settings -> Secrets and variables -> Actions
 const { createClient } = supabase;
 const _sb = createClient(
-  '__SUPABASE_URL__',
-  '__SUPABASE_KEY__'
-);
+  'const _sb = createClient('https://aspnjdmtfcezomvxcybk.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFzcG5qZG10ZmNlem9tdnhjeWJrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE2Mzc4MTEsImV4cCI6MjA5NzIxMzgxMX0.XElNTEJz7hc4H54YssQ0NvgNC7VifPSpT6Qlfi51JGs');
 
 // ── DATA API HELPER — direct Supabase queries (GitHub Pages deployment) ────
 async function api(action, params = {}) {
@@ -1211,13 +1209,27 @@ function buildLiveZones(r) {
   const ckMap = {};
   ZONE_DEFS.forEach(zd => {
     const a = currentAliases[zd.id] || zd.id;
+    // FIX: prefer the new current_risk_<zone_id> field (real E/D/M, added to
+    // fix the 4 originally-buggy zones); fall back to the original
+    // current_<alias>_type field, which was ALREADY correct for Cay Sal
+    // and Andros (never had this bug) — so this works correctly either way.
+    const newRiskField = r['current_risk_' + zd.id];
+    const oldTypeField = r['current_' + a + '_type'];
+    const realType = (newRiskField === 'E' || newRiskField === 'D' || newRiskField === 'M')
+      ? newRiskField
+      : (oldTypeField === 'E' || oldTypeField === 'D' || oldTypeField === 'M')
+        ? oldTypeField
+        : 'M';
     ckMap[zd.id] = {
       kts:  parseFloat(r['current_'+a+'_kts'])||0,
       dir:  r['current_'+a+'_dir']||'N/A',
-      type: r['current_'+a+'_type']||'M'
+      type: realType
     };
   });
-  const ctLabel = {E:'Risk Vector',D:'Deterrent Active',M:'Neutral'};
+  // FIX: label vocabulary now matches what the currents-by-zone panel
+  // actually checks for ('ENABLER' / 'DETERRENT'), instead of the old
+  // 'Risk Vector'/'Deterrent Active' wording that never matched anything.
+  const ctLabel = {E:'⚠️ ENABLER',D:'✅ DETERRENT',M:'MIXED'};
   const actions = {CRITICAL:'IMMEDIATE INTERDICTION.',HIGH:'HIGH ALERT — Notify all units.',ELEVATED:'ELEVATED ALERT — AIS sweep advised. Notify duty officer.',MODERATE:'Standard monitoring.',LOW:'Routine conditions.',MINIMAL:'Minimal threat.'};
   const icons2 = {CRITICAL:'🔴',HIGH:'🔴',ELEVATED:'🟠',MODERATE:'🟡',LOW:'🟢',MINIMAL:'⚪'};
 
@@ -1275,7 +1287,9 @@ function buildLiveZones(r) {
       priority: zd.id === priorityId,
       action: actions[level]||'Monitor.',
       alerts: zAlerts,
-      weather:{wind_max_mph:wind,wind_avg_mph:parseFloat(r.wind_avg_mph)||0,wind_night_max_mph:wind,dominant_wind_dir:r.wind_direction||'SE',precip_prob_max_pct:r.precip_prob_max_pct||0,thunderstorm_hours:r.thunderstorm_hours||0,visibility_min_miles:vis,wave_height_max_m:wave,cloud_cover_avg_pct:cloudMap[zid],pressure_trend_hpa:pressMap[zid]},
+      // FIX: read the new per-zone wind average column, falling back to
+      // the old flat bank-wide field for any zone that doesn't have it yet
+      weather:{wind_max_mph:wind,wind_avg_mph:pf(r['wind_avg_'+zid+'_mph'], pf(r.wind_avg_mph, 0)),wind_night_max_mph:wind,dominant_wind_dir:r.wind_direction||'SE',precip_prob_max_pct:r.precip_prob_max_pct||0,thunderstorm_hours:r.thunderstorm_hours||0,visibility_min_miles:vis,wave_height_max_m:wave,cloud_cover_avg_pct:cloudMap[zid],pressure_trend_hpa:pressMap[zid]},
       sst:{celsius:sst,fahrenheit:Math.round((sst*9/5+32)*10)/10,fish_concentration_score:Math.min(99,Math.max(5,Math.round((sst-24)/8*60+40)))},
       currents:{speed_knots:kts,direction_compass:ck.dir||'N/A',risk:ctLabel[cType]||'MIXED',live:r.current_source_tier==='live'},
       factors:[
@@ -1285,7 +1299,7 @@ function buildLiveZones(r) {
         {name:'Rain & Thunderstorm',type:'D',rawScore:Math.round(Math.min(99,(r.precip_prob_max_pct||0)/70*80)), val:`${r.precip_prob_max_pct||0}% / ${r.thunderstorm_hours||0}h`},
         {name:'Marine Visibility',  type:'E',rawScore:visScore,        val:`${vis}mi min`},
         {name:'Wave Height',        type:'D',rawScore:waveScore,       val:`${wave}m max`},
-        {name:'Tidal Window',       type:'M',rawScore:35,              val:`High 0.35m / Low -0.05m MLLW`},
+        {name:'Tidal Window',       type:'M',rawScore:35,              val:`High ${pf(r['tide_high_'+zid+'_m'], 0).toFixed(2)}m / Low ${pf(r['tide_low_'+zid+'_m'], 0).toFixed(2)}m MLLW`},
         {name:'Ocean Current',      type:cType,rawScore:cScore,        val:`${kts}kts ${ck.dir||'N/A'} ●${r.current_source_tier==='live'?'live':'est'}`},
         {name:'Sea Surface Temp',   type:'E',rawScore:sstScore,        val:`${sst}°C / ${Math.round((sst*9/5+32)*10)/10}°F`},
         {name:'Night Wind Calm',    type:'E',rawScore:nightWindScore,  val:`${wind}mph night`},
@@ -1300,13 +1314,14 @@ function buildLiveZones(r) {
   ZONES.sort((a,b)=>b.score-a.score);
   activeId = ZONES[0]?.id || ZONE_DEFS[0]?.id || '';
 
-  // Update tide display
-  // Use stored tide data — wave_max_m is waves not tides
-  // Tides stored in DB from NOAA: high ~0.33-0.36m, low ~-0.05 to -0.07m
-  // Tide display — uses stored values where available
-  const _tHigh = parseFloat(r.wave_max_m) || 0.35;
-  document.getElementById('tide-high').textContent = `${(r.tide_high||0.35).toFixed(2)}m MLLW`;
-  document.getElementById('tide-low').textContent = `${(r.tide_low||-0.05).toFixed(2)}m MLLW`;
+  // Update tide display — tides are the same across zones within an MPA
+  // (single station per bank), so read the top-ranked zone's real tide data
+  const _tideZoneId = ZONES[0]?.id || ZONE_DEFS[0]?.id || '';
+  function _pfTide(v, fallback) { return (v !== null && v !== undefined && !isNaN(parseFloat(v))) ? parseFloat(v) : fallback; }
+  const _realTideHigh = _pfTide(r['tide_high_'+_tideZoneId+'_m'], 0.35);
+  const _realTideLow = _pfTide(r['tide_low_'+_tideZoneId+'_m'], -0.05);
+  document.getElementById('tide-high').textContent = `${_realTideHigh.toFixed(2)}m MLLW`;
+  document.getElementById('tide-low').textContent = `${_realTideLow.toFixed(2)}m MLLW`;
   document.getElementById('tide-restrict').textContent = r.tide_restricted ? 'Atoll RESTRICTED' : 'Normal Access';
 
   buildRanking();
@@ -1667,8 +1682,12 @@ function buildMoonCountdown() {
       '<div style="font-size:9px;color:' + seasonColor + ';">' + seasonAlert + '</div>' +
     '</div>' +
     '<div style="margin-top:8px;padding-top:6px;border-top:1px solid var(--line);font-size:8px;color:var(--slate);">' +
-      'Current moon: <strong style="color:var(--ink);">' + moonPct + '%</strong> illuminated \u00b7 ' +
-      (moonPct <= 20 ? '\u26a0\ufe0f Dark \u2014 elevated risk now' : moonPct >= 85 ? '\u2705 Bright \u2014 low risk now' : 'Partial cover') +
+      // FIX: reuse window._currentMoonPct (the real, correctly-sourced value
+      // already displayed elsewhere on the page) instead of an independent
+      // Date.now()-based recalculation, which caused this line to show a
+      // different, contradictory percentage than the rest of the dashboard.
+      'Current moon: <strong style="color:var(--ink);">' + Math.round(window._currentMoonPct||0) + '%</strong> illuminated \u00b7 ' +
+      ((window._currentMoonPct||0) <= 20 ? '\u26a0\ufe0f Dark \u2014 elevated risk now' : (window._currentMoonPct||0) >= 85 ? '\u2705 Bright \u2014 low risk now' : 'Partial cover') +
     '</div>';
 }
 document.addEventListener('DOMContentLoaded', function() {
