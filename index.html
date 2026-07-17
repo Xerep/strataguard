@@ -810,6 +810,11 @@ async function switchMPA() {
 async function handleLogout() {
   try { await _sb.auth.signOut(); } catch(e) { console.log('signout error', e); }
   currentUser = null; currentMPA = null; userMPAs = [];
+  // FIX: this interval previously kept running indefinitely after logout —
+  // harmless in practice since checkForNewData() no-ops once currentMPA is
+  // null, but there's no reason to leave a background timer silently
+  // firing forever. Properly stopped now.
+  if (_autoRefreshInterval) { clearInterval(_autoRefreshInterval); _autoRefreshInterval = null; }
   // Clear session storage
   Object.keys(localStorage).filter(k=>k.startsWith('sb-')).forEach(k=>localStorage.removeItem(k));
   document.getElementById('login-screen').classList.remove('hidden');
@@ -987,7 +992,15 @@ async function showHistoricalDate(dateStr) {
     updateProvenance(data);
 
   } catch(e) {
+    // FIX: this previously only logged to console — the date badge and
+    // "viewing historical" banner had already switched to claiming this
+    // specific date before the fetch even started, so a failure here left
+    // a genuinely misleading state: a confident historical-date badge
+    // paired with whatever data was previously on screen, with zero
+    // visible indication anything went wrong.
     console.error('showHistoricalDate error:', e);
+    document.getElementById('g-level').textContent = '⚠️ Failed to Load';
+    document.getElementById('g-action').textContent = `Could not load data for ${dateStr}. Try again or select a different date.`;
   }
 }
 
@@ -1165,6 +1178,12 @@ function updateTrend(rows) {
     if (window._trendChart) {
       window._trendChart.data.labels = rows.map(r=>r.run_date.slice(5));
       window._trendChart.data.datasets[0].data = rows.map(r=>r.composite_score);
+      // FIX: this dataset was set once at chart creation and never updated
+      // again — switching between MPAs with different amounts of history
+      // (e.g. 16 days vs 5 days) would leave this reference line at its
+      // original length while the real data correctly shrank, a length
+      // mismatch Chart.js isn't guaranteed to render cleanly.
+      window._trendChart.data.datasets[1].data = rows.map(()=>50);
       window._trendChart.update();
     } else {
       const ctx = document.getElementById('trendChart').getContext('2d');
