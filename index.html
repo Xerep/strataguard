@@ -602,6 +602,21 @@ const MPA_ICONS = {
   'exuma_cays':    '🪸',
 };
 
+// FIX: this same coordinate set previously existed as two independent
+// copies, defined separately inside updateMapMarkers() and initMap(). They
+// happened to still agree today, but this is the exact same setup that
+// caused a real, silent divergence bug elsewhere in the system earlier
+// today (tide stations). Consolidated into one shared source so they can
+// no longer drift apart.
+const MPA_CENTERS = {
+  'andros':        { center:[24.30,-78.10], zoom:8  },
+  'cay_sal_bank':  { center:[23.90,-80.40], zoom:9  },
+  'great_inagua':  { center:[21.20,-73.20], zoom:9  },
+  'diamond_point': { center:[23.50,-77.80], zoom:10 },
+  'jumentos_cays': { center:[22.80,-75.50], zoom:10 },
+  'exuma_cays':    { center:[23.70,-76.30], zoom:10 },
+};
+
 let currentUser = null;
 let currentMPA  = null;
 let userMPAs    = [];
@@ -728,6 +743,23 @@ function selectMPA(mpa) {
   // Update zone definitions for this MPA
   ZONE_DEFS = MPA_ZONE_DEFS[mpa.mpa_id] || MPA_ZONE_DEFS['cay_sal_bank'];
   activeId = ZONE_DEFS[0]?.id || ''; // reset active zone to first zone of new MPA
+  // FIX: same missing-reset pattern as elsewhere today — switching MPAs
+  // never reset the date-picker state, so viewing a historical date on one
+  // MPA then switching to another left the old date badge and "viewing
+  // historical" banner stuck on screen, even though the newly loaded data
+  // is actually live/current for the new MPA.
+  currentDateIndex = -1;
+  const _dateSelect = document.getElementById('date-select');
+  if (_dateSelect) _dateSelect.value = 'latest';
+  const _dateBadge = document.getElementById('date-badge');
+  if (_dateBadge) {
+    _dateBadge.textContent = 'LIVE';
+    _dateBadge.style.background = 'rgba(26,107,60,0.2)';
+    _dateBadge.style.borderColor = 'rgba(26,107,60,0.4)';
+    _dateBadge.style.color = '#5DC98A';
+  }
+  const _histBanner = document.getElementById('historical-banner');
+  if (_histBanner) { _histBanner.classList.remove('active'); _histBanner.style.display = 'none'; }
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('mpa-select-screen').classList.remove('visible');
   document.getElementById('dashboard-content').classList.add('visible');
@@ -740,16 +772,13 @@ function selectMPA(mpa) {
   const mapTitle = document.getElementById('map-zone-count-title');
   if(mapTitle) mapTitle.textContent = zCount+'-Zone Coverage Map';
   document.getElementById('map-mpa-label').textContent = mpa.mpa_name;
-  const _coordsMap = {
-    'cay_sal_bank':  '23.9°N · 80.4°W',
-    'andros':        '24.3°N · 78.1°W',
-    'great_inagua':  '21.2°N · 73.2°W',
-    'diamond_point': '23.5°N · 77.8°W',
-    'jumentos_cays': '22.8°N · 75.5°W',
-    'exuma_cays':    '23.7°N · 76.3°W',
-  };
+  // FIX: was a fourth independent copy of the same coordinate data. Now
+  // derived from the single shared MPA_CENTERS source instead.
   const _coordsEl = document.getElementById('map-mpa-coords');
-  if (_coordsEl) _coordsEl.textContent = _coordsMap[mpa.mpa_id] || '';
+  if (_coordsEl) {
+    const _c = MPA_CENTERS[mpa.mpa_id]?.center;
+    _coordsEl.textContent = _c ? `${_c[0].toFixed(1)}°N · ${Math.abs(_c[1]).toFixed(1)}°W` : '';
+  }
   const _zcEl = document.getElementById('map-zone-count');
   if (_zcEl) _zcEl.textContent = (MPA_ZONE_DEFS[mpa.mpa_id] || []).length;
 
@@ -1109,8 +1138,16 @@ function updateRegulatory(r) {
   const box = document.getElementById('regulatory-box');
   const sp = document.getElementById('reg-species');
   const det = document.getElementById('reg-detail');
+  // FIX: the "active" branch previously only set borderColor and left
+  // background/text-color untouched — meaning if a prior view had shown
+  // "open season" (green background, green text), switching to a closed-
+  // season zone or date would incorrectly keep the green styling while
+  // showing enforcement text, a real, confusing partial-reset bug. Both
+  // branches now fully specify every property they touch.
   if (r.regulatory_active) {
+    box.style.background = '#FEF0EE';
     box.style.borderColor = '#FBCDC7';
+    sp.style.color = 'var(--enable)';
     sp.textContent = r.regulatory_species || 'Closed Season Active';
     det.textContent = 'Closed season active · Enforcement window active · Black market demand elevated';
   } else {
@@ -1602,14 +1639,6 @@ function updateMarkerStyles(){
 function updateMapMarkers(){
   if(!window._map) return;
   const mpaId = currentMPA?.mpa_id || 'cay_sal_bank';
-  const MPA_CENTERS = {
-    'andros':        { center:[24.30,-78.10], zoom:8  },
-    'cay_sal_bank':  { center:[23.90,-80.40], zoom:9  },
-    'great_inagua':  { center:[21.20,-73.20], zoom:9  },
-    'diamond_point': { center:[23.50,-77.80], zoom:10 },
-    'jumentos_cays': { center:[22.80,-75.50], zoom:10 },
-    'exuma_cays':    { center:[23.70,-76.30], zoom:10 },
-  };
   const mpaView = MPA_CENTERS[mpaId] || { center:[23.75,-80.05], zoom:8 };
   window._map.setView(mpaView.center, mpaView.zoom);
 
@@ -1666,15 +1695,7 @@ function initMap(){
 
         // Set view AFTER tiles added — center depends on MPA
     const _mpaId = currentMPA?.mpa_id || 'cay_sal_bank';
-    const _MPA_CENTERS = {
-      'andros':        { center:[24.30,-78.10], zoom:8  },
-      'cay_sal_bank':  { center:[23.90,-80.40], zoom:9  },
-      'great_inagua':  { center:[21.20,-73.20], zoom:9  },
-      'diamond_point': { center:[23.50,-77.80], zoom:10 },
-      'jumentos_cays': { center:[22.80,-75.50], zoom:10 },
-      'exuma_cays':    { center:[23.70,-76.30], zoom:10 },
-    };
-    const _mpaView = _MPA_CENTERS[_mpaId] || { center:[23.75,-80.05], zoom:8 };
+    const _mpaView = MPA_CENTERS[_mpaId] || { center:[23.75,-80.05], zoom:8 };
     map.setView(_mpaView.center, _mpaView.zoom);
     map.invalidateSize(true);
 
