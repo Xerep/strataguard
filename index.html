@@ -1000,10 +1000,24 @@ function updateHeader(r) {
   cpill.className = `cpill ${pillCls[r.composite_level]||'pill-moderate'}`;
 
   const dataAge = (Date.now() - new Date(r.run_timestamp).getTime()) / 3600000;
+  const banner = document.getElementById('fm-banner');
+  // FIX: this previously only ever turned the warning ON, never off — once
+  // triggered, it stayed visible forever even after fresh data loaded via
+  // auto-refresh, showing an increasingly wrong "X hours ago" figure
+  // alongside a header that had already updated to the correct, current
+  // timestamp. It also shared one element with the separate Threat
+  // Condition Alerts banner with no coordination, meaning a stale data
+  // warning could silently block a real, current alert from ever showing.
+  // Now each concern tracks its own state via a data attribute, so neither
+  // can stomp on or get stuck blocking the other.
   if (dataAge > 30) {
-    const banner = document.getElementById('fm-banner');
     banner.className = 'fm-banner active';
+    banner.dataset.bannerType = 'data-warning';
     banner.innerHTML = `<strong>⚠️ DATA WARNING:</strong> Last successful run was ${Math.round(dataAge)} hours ago. Showing data from ${r.run_date}.`;
+  } else if (banner.dataset.bannerType === 'data-warning') {
+    banner.className = 'fm-banner';
+    banner.innerHTML = '';
+    delete banner.dataset.bannerType;
   }
 }
 
@@ -1410,8 +1424,14 @@ function updateFM(z){
   const card=document.getElementById('fm-detail-card');
   const body=document.getElementById('fm-detail-body');
   if(z.alerts && z.alerts.length>0){
-    if(!banner.classList.contains('active')){
+    // FIX: previously checked only classList.contains('active'), meaning a
+    // leftover stale-data warning (which also sets 'active') would block a
+    // real, current threat alert from ever being written. Now only skips
+    // re-writing if THIS banner already correctly shows a threat alert —
+    // always overrides a data-warning or empty banner.
+    if(banner.dataset.bannerType !== 'threat-alert'){
       banner.className='fm-banner active';
+      banner.dataset.bannerType='threat-alert';
       banner.innerHTML=`<strong>⚡ Threat Condition Alerts Active — ${z.name}:</strong> ${z.alerts.map(a=>a.text).join(' | ')}`;
     }
     card.style.display='block';
