@@ -1547,19 +1547,31 @@ function updateFM(z){
   const card=document.getElementById('fm-detail-card');
   const body=document.getElementById('fm-detail-body');
   if(z.alerts && z.alerts.length>0){
-    // FIX: previously checked only classList.contains('active'), meaning a
-    // leftover stale-data warning (which also sets 'active') would block a
-    // real, current threat alert from ever being written. Now only skips
-    // re-writing if THIS banner already correctly shows a threat alert —
-    // always overrides a data-warning or empty banner.
-    if(banner.dataset.bannerType !== 'threat-alert'){
+    // FIX (round 2): the previous fix only tracked banner TYPE
+    // ('threat-alert'), not WHICH zone's alerts were shown — meaning
+    // switching between two different zones that both have alerts would
+    // incorrectly keep displaying the first zone's alert text forever,
+    // since the check only cared that *a* threat alert was already
+    // showing, not that it was the CURRENT zone's. Now tracks zone
+    // identity too, and the else branch below now actually clears the
+    // banner when the newly selected zone has no alerts — previously it
+    // only hid the detail card, leaving a past zone's alert text stuck in
+    // the banner even when viewing a zone with nothing active.
+    if(banner.dataset.bannerType !== 'threat-alert' || banner.dataset.bannerZone !== z.id){
       banner.className='fm-banner active';
       banner.dataset.bannerType='threat-alert';
+      banner.dataset.bannerZone=z.id;
       banner.innerHTML=`<strong>⚡ Threat Condition Alerts Active — ${z.name}:</strong> ${z.alerts.map(a=>a.text).join(' | ')}`;
     }
     card.style.display='block';
     body.innerHTML=z.alerts.map(a=>`<div class="fm-card"><div class="fm-card-title">⚡ ${a.type==='visibility'?'Reduced Visibility Alert':'Premium Target Conditions'}</div><div class="fm-card-body">${a.text}</div></div>`).join('');
   } else {
+    if(banner.dataset.bannerType === 'threat-alert'){
+      banner.className='fm-banner';
+      banner.innerHTML='';
+      delete banner.dataset.bannerType;
+      delete banner.dataset.bannerZone;
+    }
     card.style.display='none';
   }
 }
@@ -1857,15 +1869,21 @@ async function checkForNewData() {
       .order('run_date', { ascending: false })
       .limit(1);
     if (error || !data || data.length === 0) return;
-    const latestDate = data[0].run_date;
+    // FIX: this only compared run_date (calendar date), not run_timestamp —
+    // meaning a same-day re-run (exactly what happened repeatedly during
+    // today's own testing) would never trigger the auto-refresh, even
+    // though the underlying data had genuinely changed. run_timestamp was
+    // already being fetched, just never used. Now detects any real update,
+    // not just a new calendar day.
+    const latestTimestamp = data[0].run_timestamp;
     if (!_lastDisplayedDate) {
-      // First check — just record current date
-      _lastDisplayedDate = latestDate;
+      // First check — just record current state
+      _lastDisplayedDate = latestTimestamp;
       return;
     }
-    if (latestDate !== _lastDisplayedDate) {
+    if (latestTimestamp !== _lastDisplayedDate) {
       // New data arrived — reload dashboard
-      _lastDisplayedDate = latestDate;
+      _lastDisplayedDate = latestTimestamp;
       await loadLiveData(currentMPA.mpa_id);
       // Show green notification
       const notif = document.createElement('div');
