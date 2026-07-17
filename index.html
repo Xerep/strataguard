@@ -1480,7 +1480,13 @@ function buildSidePanels(){
     <div style="display:grid;grid-template-columns:108px 1fr auto;align-items:center;padding:3px 0;border-bottom:1px solid var(--line);gap:4px;">
       <span style="font-size:9px;font-weight:600;color:var(--ink);">${z.name}</span>
       <span style="font-size:9px;font-weight:700;color:var(--teal);">${z.currents.speed_knots}kts ${z.currents.direction_compass} <span style="color:${z.currents.live?'#5DC98A':'var(--gold)'};font-size:6.5px;">${z.currents.live?'●live':'●est'}</span></span>
-      <span style="font-size:7.5px;color:${z.currents.risk.includes('ENABLER')?'var(--orange)':'var(--green)'};text-align:right;">${z.currents.risk.includes('ENABLER')?'⚠️ Risk Vector':'✅ Deterrent'}</span>
+      <span style="font-size:7.5px;color:${z.currents.risk.includes('ENABLER')?'var(--orange)':z.currents.risk.includes('DETERRENT')?'var(--green)':'var(--gold)'};text-align:right;">${z.currents.risk.includes('ENABLER')?'⚠️ Risk Vector':z.currents.risk.includes('DETERRENT')?'✅ Deterrent':'➖ Mixed'}</span>
+      <!-- FIX: this was a binary check (ENABLER vs everything-else), which
+      silently folded genuine MIXED classifications into "✅ Deterrent" —
+      wrong, since the underlying data has 3 real states (E/D/M), not 2.
+      Now checks for all 3 explicitly, matching what the main factor table
+      already correctly shows for the same zone. -->
+
     </div>`).join('');
 
   document.getElementById('sst-by-zone').innerHTML=
