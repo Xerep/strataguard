@@ -692,20 +692,36 @@ async function loadUserMPAs() {
           : 9999
       }));
     } else {
-      userMPAs = [
-        { mpa_id:'cay_sal_bank', mpa_name:'Cay Sal Bank',     plan:'standard', expires_at:null, days_remaining:9999 },
-        { mpa_id:'andros',       mpa_name:'Andros West Coast', plan:'standard', expires_at:null, days_remaining:9999 },
-      ];
+      // FIX: previously defaulted a user with zero real access rows to
+      // Cay Sal Bank + Andros access anyway — the same fail-open pattern
+      // as the catch block below, just via a different path (a query that
+      // succeeded but legitimately found nothing, rather than one that
+      // failed outright). An authenticated user with no granted access
+      // should see that honestly, not be silently handed access to real
+      // operational data they were never actually authorized for.
+      userMPAs = [];
     }
   } catch(e) {
+    // FIX: previously defaulted to the same fallback access on any query
+    // failure — network blip, misconfigured policy, anything — silently
+    // granting access rather than surfacing that something went wrong.
+    // Now fails closed: no access granted, and the real error is shown.
     console.error('loadUserMPAs error:', e);
-    userMPAs = [
-        { mpa_id:'cay_sal_bank', mpa_name:'Cay Sal Bank',     plan:'standard', expires_at:null, days_remaining:9999 },
-        { mpa_id:'andros',       mpa_name:'Andros West Coast', plan:'standard', expires_at:null, days_remaining:9999 },
-      ];
+    document.getElementById('login-screen').classList.remove('hidden');
+    document.getElementById('login-error').textContent =
+      'Could not verify your access. Please try again, or contact StrataGuard if this continues.';
+    document.getElementById('login-btn').disabled = false;
+    document.getElementById('login-btn').textContent = 'ACCESS DASHBOARD';
+    return;
   }
 
-  if (userMPAs.length === 1) {
+  if (userMPAs.length === 0) {
+    document.getElementById('login-screen').classList.remove('hidden');
+    document.getElementById('login-error').textContent =
+      'Your account has no Monitoring Zone access yet. Contact StrataGuard to request access.';
+    document.getElementById('login-btn').disabled = false;
+    document.getElementById('login-btn').textContent = 'ACCESS DASHBOARD';
+  } else if (userMPAs.length === 1) {
     selectMPA(userMPAs[0]);
   } else {
     showMPASelector();
@@ -1652,18 +1668,17 @@ function buildSidePanels(){
     </div>`).join('');
 
   document.getElementById('sst-by-zone').innerHTML=
-    '<div style="display:grid;grid-template-columns:120px 1fr 90px;padding:3px 0 5px;margin-bottom:3px;border-bottom:2px solid var(--line);"><span style="font-size:7.5px;font-weight:700;color:var(--slate);text-transform:uppercase;">Zone</span><span style="font-size:7.5px;font-weight:700;color:var(--slate);text-transform:uppercase;">SST</span><span style="font-size:7.5px;font-weight:700;color:var(--slate);text-transform:uppercase;">Status</span></div>'+
+    '<div style="display:grid;grid-template-columns:120px 1fr;padding:3px 0 5px;margin-bottom:3px;border-bottom:2px solid var(--line);"><span style="font-size:7.5px;font-weight:700;color:var(--slate);text-transform:uppercase;">Zone</span><span style="font-size:7.5px;font-weight:700;color:var(--slate);text-transform:uppercase;">SST</span></div>'+
     ZONES.map(z=>{
-      const sstC = z.sst.celsius;
-      const sstColor = sstC>=29.5?'var(--red)':sstC>=28.5?'var(--orange)':sstC>=27?'var(--gold)':'var(--green)';
-      const sstStatus = sstC>=29.5?'Critical':sstC>=28.5?'Elevated':sstC>=27?'Watch':'Nominal';
-      return `<div style="display:grid;grid-template-columns:120px 1fr 90px;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);">
+      // FIX: previously invented its own "Critical/Elevated/Watch/Nominal"
+      // severity labels for SST — clashing vocabulary with the real system
+      // threat levels, AND (per the headline finding of today's audit)
+      // presenting false confidence in a value not calibrated to the real
+      // backend formula. Now shows the real reading only, no invented
+      // judgment attached to it.
+      return `<div style="display:grid;grid-template-columns:120px 1fr;align-items:center;padding:5px 0;border-bottom:1px solid var(--line);">
         <span style="font-size:9px;font-weight:600;color:var(--ink);">${z.name}</span>
         <span style="font-size:9px;font-weight:700;color:var(--enable);">${z.sst.celsius}°C / ${z.sst.fahrenheit}°F</span>
-        <div style="display:flex;align-items:center;gap:5px;">
-          <div style="width:8px;height:8px;border-radius:50%;background:${sstColor};flex-shrink:0;"></div>
-          <span style="font-size:8.5px;font-weight:700;color:${sstColor};">${sstStatus}</span>
-        </div>
       </div>`;
     }).join('');
 }
