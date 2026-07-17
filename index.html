@@ -754,10 +754,16 @@ function selectMPA(mpa) {
   if (_zcEl) _zcEl.textContent = (MPA_ZONE_DEFS[mpa.mpa_id] || []).length;
 
   // Expiry warning
+  // FIX: same pattern as the earlier data-warning banner — this only ever
+  // turned on, never off. Switching from an MPA with an expiry warning to
+  // one without would leave the old MPA's warning text stuck on screen.
+  const _expiryBanner = document.getElementById('expiry-banner');
   if (mpa.days_remaining <= 7 && mpa.days_remaining < 9999) {
-    const banner = document.getElementById('expiry-banner');
-    banner.className = 'expiry-banner active';
-    banner.innerHTML = `⚠️ Your ${mpa.mpa_name} subscription expires in ${mpa.days_remaining} days. Contact StrataGuard to renew.`;
+    _expiryBanner.className = 'expiry-banner active';
+    _expiryBanner.innerHTML = `⚠️ Your ${mpa.mpa_name} subscription expires in ${mpa.days_remaining} days. Contact StrataGuard to renew.`;
+  } else {
+    _expiryBanner.className = 'expiry-banner';
+    _expiryBanner.innerHTML = '';
   }
 
   loadLiveData(mpa.mpa_id);
@@ -1062,7 +1068,15 @@ function buildTimeline(r) {
   const ss = parseTime(r.sunset_local) || 20.18;
   const ae = parseTime(r.full_dark_start) || 21.63;
   const ab = parseTime(r.full_dark_end) || 5.1;
-  const now = new Date(); const nh = now.getHours() + now.getMinutes()/60;
+  // FIX: this used the viewer's own browser timezone, not Nassau's — every
+  // other time on this timeline is explicitly labeled "Nassau" and computed
+  // correctly for it, but this marker would silently show the wrong
+  // position for any viewer outside that timezone. Intl.DateTimeFormat
+  // handles Nassau's DST transitions automatically, unlike a fixed offset.
+  const _nassauParts = new Intl.DateTimeFormat('en-US', {timeZone:'America/Nassau', hour:'numeric', minute:'numeric', hour12:false}).formatToParts(new Date());
+  const _nassauH = parseInt(_nassauParts.find(p=>p.type==='hour').value, 10);
+  const _nassauM = parseInt(_nassauParts.find(p=>p.type==='minute').value, 10);
+  const nh = _nassauH + _nassauM/60;
   const bar = document.getElementById('tl-bar');
   function p(h){return(h/24*100).toFixed(2)+'%';}
   function w(a,b){return((b-a)/24*100).toFixed(2)+'%';}
@@ -1143,13 +1157,23 @@ function updateProvenance(r) {
     document.getElementById('prov-currents').textContent = 'ESTIMATE';
     document.getElementById('prov-currents').className = 'ptag est';
   }
+  // FIX: same missing-else pattern found elsewhere today — this only ever
+  // downgraded to SECONDARY, never reset back to PRIMARY on a later
+  // refresh or date change where data genuinely was primary again.
   if (r.sst_source_tier !== 'primary') {
     document.getElementById('prov-sst').textContent = 'SECONDARY';
     document.getElementById('prov-sst').className = 'ptag est';
+  } else {
+    document.getElementById('prov-sst').textContent = 'PRIMARY';
+    document.getElementById('prov-sst').className = 'ptag';
   }
+  // FIX: same missing-else pattern — completes the fix for this function.
   if (!r.all_systems_nominal) {
     document.getElementById('prov-status-text').textContent = 'DEGRADED DATA — CHECK SOURCES';
     document.querySelector('.prov-dot').style.background = '#E8B84B';
+  } else {
+    document.getElementById('prov-status-text').textContent = 'ALL SYSTEMS NOMINAL';
+    document.querySelector('.prov-dot').style.background = '#5DC98A';
   }
 }
 
