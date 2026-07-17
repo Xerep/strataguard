@@ -1321,12 +1321,16 @@ function buildLiveZones(r) {
         {name:'Rain & Thunderstorm',type:'D',rawScore:Math.round(Math.min(99,(r.precip_prob_max_pct||0)/70*80)), val:`${r.precip_prob_max_pct||0}% / ${r.thunderstorm_hours||0}h`},
         {name:'Marine Visibility',  type:'E',rawScore:visScore,        val:`${vis}mi min`},
         {name:'Wave Height',        type:'D',rawScore:waveScore,       val:`${wave}m max`},
-        {name:'Tidal Window',       type:'M',rawScore:35,              val:`High ${pf(r['tide_high_'+zid+'_m'], 0).toFixed(2)}m / Low ${pf(r['tide_low_'+zid+'_m'], 0).toFixed(2)}m MLLW`},
-        {name:'Ocean Current',      type:cType,rawScore:cScore,        val:`${kts}kts ${ck.dir||'N/A'} ●${r.current_source_tier==='live'?'live':'est'}`},
+        // FIX: today's server-side disclosures (uncertainty flag, tide
+        // station notice, clearer pressure label) were only ever added to
+        // the email/backend text — the dashboard rebuilds these display
+        // strings independently and never got any of them. Added here.
+        {name:'Tidal Window',       type:'M',rawScore:35,              val:`High ${pf(r['tide_high_'+zid+'_m'], 0).toFixed(2)}m / Low ${pf(r['tide_low_'+zid+'_m'], 0).toFixed(2)}m MLLW${['andros','diamond_point','exuma_cays','jumentos_cays'].includes(currentMPA?.mpa_id) ? ' ⚠️ Regional reference station' : ''}`},
+        {name:'Ocean Current',      type:cType,rawScore:cScore,        val:`${kts}kts ${ck.dir||'N/A'} ●${r.current_source_tier==='live'?'live':'est'}${kts>=1.5 ? ' ⚠️ Model Uncertainty' : ''}`},
         {name:'Sea Surface Temp',   type:'E',rawScore:sstScore,        val:`${sst}°C / ${Math.round((sst*9/5+32)*10)/10}°F`},
         {name:'Night Wind Calm',    type:'E',rawScore:nightWindScore,  val:`${wind}mph night`},
         {name:'Cloud Cover',        type:'E',rawScore:cloudScore,      val:`${cloudMap[zid]}%`},
-        {name:'Pressure Trend',     type:'D',rawScore:ptScore,         val:`${pressMap[zid]} hPa`},
+        {name:'Pressure Trend (24h Δ)',     type:'D',rawScore:ptScore,         val:`${pressMap[zid]} hPa`},
         {name:'Moon Illumination',  type:'E',rawScore:moonScore,       val:`${moon}% (${r.moon_phase||'—'})`},
         {name:'Regulatory Vuln.',   type:'E',rawScore:r.regulatory_active?80:15, val:r.regulatory_active?r.regulatory_species:'None'},
       ]
@@ -1344,7 +1348,8 @@ function buildLiveZones(r) {
   const _realTideLow = _pfTide(r['tide_low_'+_tideZoneId+'_m'], -0.05);
   document.getElementById('tide-high').textContent = `${_realTideHigh.toFixed(2)}m MLLW`;
   document.getElementById('tide-low').textContent = `${_realTideLow.toFixed(2)}m MLLW`;
-  document.getElementById('tide-restrict').textContent = r.tide_restricted ? 'Atoll RESTRICTED' : 'Normal Access';
+  const _tideDisclosure = ['andros','diamond_point','exuma_cays','jumentos_cays'].includes(currentMPA?.mpa_id) ? ' · ⚠️ Regional station' : '';
+  document.getElementById('tide-restrict').textContent = (r.tide_restricted ? 'Atoll RESTRICTED' : 'Normal Access') + _tideDisclosure;
 
   buildRanking();
   buildCondStrip(ZONES[0]);
@@ -1413,7 +1418,7 @@ function updateGauge(z){
   document.getElementById('g-meta').innerHTML=`
     <div class="meta-row"><span class="meta-label">Zone</span><span class="meta-val">${z.label}</span></div>
     <div class="meta-row"><span class="meta-label">SST</span><span class="meta-val">${s.celsius}°C / ${s.fahrenheit}°F</span></div>
-    <div class="meta-row"><span class="meta-label">Current</span><span class="meta-val">${c.speed_knots}kts ${c.direction_compass} <span style="color:${c.live?'var(--green)':'var(--gold)'};font-size:7.5px;">${c.live?'●live':'●est'}</span></span></div>
+    <div class="meta-row"><span class="meta-label">Current</span><span class="meta-val">${c.speed_knots}kts ${c.direction_compass} <span style="color:${c.live?'var(--green)':'var(--gold)'};font-size:7.5px;">${c.live?'●live':'●est'}</span>${c.speed_knots>=1.5?' <span style="color:var(--orange);font-size:7.5px;">⚠️</span>':''}</span></div>
     <div class="meta-row"><span class="meta-label">Wind</span><span class="meta-val">${w.wind_max_mph}mph / ${w.dominant_wind_dir}</span></div>
     <div class="meta-row"><span class="meta-label">Visibility</span><span class="meta-val" style="color:${w.visibility_min_miles<3?'var(--orange)':'inherit'};">${w.visibility_min_miles}mi min</span></div>
     <div class="meta-row" style="background:#FFF8EE;"><span class="meta-label">Status</span><span class="meta-val" style="font-size:8px;">StrataGuard Composite Intelligence Score™</span></div>`;
@@ -1468,7 +1473,7 @@ function updateFactors(z){
     'Sea Surface Temp':   { note:'Thermal conditions' },
     'Night Wind Calm':    { note:'Nocturnal assessment' },
     'Cloud Cover':        { note:'Atmospheric opacity' },
-    'Pressure Trend':     { note:'Pressure assessment' },
+    'Pressure Trend (24h Δ)': { note:'Pressure assessment' },
     'Moon Illumination':  { note:'Lunar assessment' },
     'Regulatory Vuln.':   { note:'Compliance window' },
   };
@@ -1506,7 +1511,7 @@ function buildSidePanels(){
   document.getElementById('current-by-zone').innerHTML=ZONES.map(z=>`
     <div style="display:grid;grid-template-columns:108px 1fr auto;align-items:center;padding:3px 0;border-bottom:1px solid var(--line);gap:4px;">
       <span style="font-size:9px;font-weight:600;color:var(--ink);">${z.name}</span>
-      <span style="font-size:9px;font-weight:700;color:var(--teal);">${z.currents.speed_knots}kts ${z.currents.direction_compass} <span style="color:${z.currents.live?'#5DC98A':'var(--gold)'};font-size:6.5px;">${z.currents.live?'●live':'●est'}</span></span>
+      <span style="font-size:9px;font-weight:700;color:var(--teal);">${z.currents.speed_knots}kts ${z.currents.direction_compass} <span style="color:${z.currents.live?'#5DC98A':'var(--gold)'};font-size:6.5px;">${z.currents.live?'●live':'●est'}</span>${z.currents.speed_knots>=1.5?' <span style="color:var(--orange);font-size:6.5px;" title="Elevated Model Uncertainty — Bank Terrain">⚠️</span>':''}</span>
       <span style="font-size:7.5px;color:${z.currents.risk.includes('ENABLER')?'var(--orange)':z.currents.risk.includes('DETERRENT')?'var(--green)':'var(--gold)'};text-align:right;">${z.currents.risk.includes('ENABLER')?'⚠️ Risk Vector':z.currents.risk.includes('DETERRENT')?'✅ Deterrent':'➖ Mixed'}</span>
       <!-- FIX: this was a binary check (ENABLER vs everything-else), which
       silently folded genuine MIXED classifications into "✅ Deterrent" —
