@@ -1016,6 +1016,13 @@ function updateAstro(r) {
   document.getElementById('ast-dark-start').textContent = r.full_dark_start;
   document.getElementById('ast-dark-end').textContent = r.full_dark_end;
   window._currentMoonPct = r.moon_illumination_pct || 0;
+  // FIX: the moon countdown widget runs on a fixed schedule (500ms, then
+  // every 60s) independent of when real data actually loads. If real data
+  // arrives after that first render, the widget shows a stale 0% default
+  // until its next scheduled tick — up to 60 seconds of a real, visible
+  // mismatch against the rest of the page. Refresh it right here, the
+  // moment the real value is actually known, instead of waiting on it.
+  if (typeof buildMoonCountdown === 'function') buildMoonCountdown();
   document.getElementById('ast-moon').textContent = `${r.moon_illumination_pct}% — ${r.moon_phase}`;
   document.getElementById('tl-dusk-label').textContent = 'Dusk ' + (r.civil_dusk_local||'—');
   document.getElementById('tl-dawn-label').textContent = 'Dawn ' + (r.civil_dawn_local||'—');
