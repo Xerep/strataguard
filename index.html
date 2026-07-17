@@ -1336,7 +1336,17 @@ function buildLiveZones(r) {
   const icons2 = {CRITICAL:'🔴',HIGH:'🔴',ELEVATED:'🟠',MODERATE:'🟡',LOW:'🟢',MINIMAL:'⚪'};
 
   // Priority zone
-  const priorityId = Object.entries(scoreMap).sort((a,b)=>b[1]-a[1])[0]?.[0] || ZONE_DEFS[0]?.id || '';
+  // FIX: this recomputed priority zone independently, client-side, using
+  // plain score sorting with no tie-breaker logic — while the header
+  // correctly reads the real, authoritative r.priority_zone value, which
+  // the backend determines using an explicit tie-breaking order. Confirmed
+  // using real tied scores from today's actual data (two Exuma zones both
+  // at 66) that these are two separate, independent mechanisms with no
+  // guarantee of agreeing. Today's specific tie happened to coincidentally
+  // match — that's coincidence, not a guarantee for the next one. Now
+  // matches against the same real, stored value the header uses.
+  const _realPriorityZone = ZONE_DEFS.find(zd => zd.name === r.priority_zone);
+  const priorityId = _realPriorityZone?.id || Object.entries(scoreMap).sort((a,b)=>b[1]-a[1])[0]?.[0] || ZONE_DEFS[0]?.id || '';
 
   ZONES = ZONE_DEFS.map(zd => {
     const score = scoreMap[zd.id] || 0;
@@ -1365,7 +1375,14 @@ function buildLiveZones(r) {
     const kts  = parseFloat(ck.kts)||0;
     const cType = ck.type||'M';
     const cScore = cType==='E'?Math.round(Math.min(95,kts/3*80)):cType==='D'?Math.round(Math.max(5,100-kts/3*80)):40;
-    const zAlerts = alerts.filter(a=>a.includes(sst.toString().slice(0,4))||a.includes('VISIBILITY')).slice(0,2).map(a=>({
+    // FIX: this matched alerts to zones by checking if a 4-character prefix
+    // of the SST value appeared in the alert text — confirmed, using real
+    // data from today's actual Cay Sal Bank report, that Elbow Cays (29.80)
+    // and Anguilla Cays (29.84) share the same "29.8" prefix, meaning
+    // Elbow Cays would incorrectly display Anguilla's alert as its own.
+    // Matching against the full 2-decimal value (matching the backend's
+    // actual alert text precision) meaningfully narrows this collision risk.
+    const zAlerts = alerts.filter(a=>a.includes(sst.toFixed(2))||a.includes('VISIBILITY')).slice(0,2).map(a=>({
       type:a.includes('VISIBILITY')?'visibility':'premium',
       text:a.replace(/ \(\+\d+pts\)/,''),
       pts:parseInt(a.match(/\+(\d+)pts/)?.[1]||'5')
@@ -1379,7 +1396,12 @@ function buildLiveZones(r) {
     const sstScore = Math.round(Math.min(99,(sst-24)/8*100+20));
     const nightWindScore = Math.round(Math.max(5,100-wind/22*100));
     const cloudScore = Math.round((r.cloud_cover_avg_pct||0)/100*70+10);
-    const ptScore = Math.round(Math.min(99,Math.max(5,(parseFloat(r.pressure_trend_hpa)||0+3)/6*100)));
+    // FIX: dashboard previously computed its own varying pressure score and
+    // classified it as a Deterrent. The real backend explicitly reclassified
+    // this factor to always-neutral based on real evidence ("zero
+    // correlation across all 9 confirmed incidents") — the dashboard never
+    // knew that decision was made. Matched to the real backend behavior.
+    const ptScore = 50;
     const moonScore = Math.round(Math.max(4,100-moon));
     const darkHours = (24-(r.daylight_hours||13.65)).toFixed(1);
 
@@ -1410,7 +1432,7 @@ function buildLiveZones(r) {
         {name:'Sea Surface Temp',   type:'E',rawScore:sstScore,        val:`${sst}°C / ${Math.round((sst*9/5+32)*10)/10}°F`},
         {name:'Night Wind Calm',    type:'E',rawScore:nightWindScore,  val:`${wind}mph night`},
         {name:'Cloud Cover',        type:'E',rawScore:cloudScore,      val:`${cloudMap[zid]}%`},
-        {name:'Pressure Trend (24h Δ)',     type:'D',rawScore:ptScore,         val:`${pressMap[zid]} hPa`},
+        {name:'Pressure Trend (24h Δ)',     type:'M',rawScore:ptScore,         val:`${pressMap[zid]} hPa`},
         {name:'Moon Illumination',  type:'E',rawScore:moonScore,       val:`${moon}% (${r.moon_phase||'—'})`},
         {name:'Regulatory Vuln.',   type:'E',rawScore:r.regulatory_active?80:15, val:r.regulatory_active?r.regulatory_species:'None'},
       ]
@@ -1418,7 +1440,18 @@ function buildLiveZones(r) {
   });
 
   ZONES.sort((a,b)=>b.score-a.score);
-  activeId = ZONES[0]?.id || ZONE_DEFS[0]?.id || '';
+  // FIX: this previously reset activeId to the top-ranked zone on every
+  // single data load — including every auto-refresh and every date
+  // navigation click. If someone selected a specific zone to review, then
+  // clicked through historical dates to see its trend, the dashboard would
+  // silently jump them back to whatever zone ranked #1 for each new date,
+  // discarding their actual selection every time. Now preserves the
+  // current selection if it's still a valid zone in the new data, only
+  // falling back to the top-ranked zone on a genuinely fresh load.
+  const _prevActiveStillValid = activeId && ZONES.some(z => z.id === activeId);
+  if (!_prevActiveStillValid) {
+    activeId = ZONES[0]?.id || ZONE_DEFS[0]?.id || '';
+  }
 
   // Update tide display — tides are the same across zones within an MPA
   // (single station per bank), so read the top-ranked zone's real tide data
@@ -1445,7 +1478,12 @@ function buildLiveZones(r) {
 function buildRanking(){
   document.getElementById('zone-ranking').innerHTML = ZONES.map((z,i)=>{
     const color=lcolor(z.level), isActive=z.id===activeId;
-    const alertStr = z.alerts.map(a=>`⚡ +${a.pts}pts`).join(' · ');
+    // FIX: this always showed a hardcoded "+5pts" for every alert type,
+    // since real alert text never actually contains a "+Npts" pattern to
+    // extract — confirmed against every real alert seen today. Showing a
+    // fake, identical number for every alert is worse than showing none,
+    // since it implies specific precision that was never real.
+    const alertStr = z.alerts.map(a=>`⚡ ${a.type==='visibility'?'Visibility Alert':'Premium Target'}`).join(' · ');
     return `<div class="zr-card${isActive?' active':''}" onclick="selectZone('${z.id}')">
       <div class="zr-rank-num">#${i+1}</div>
       ${z.priority?'<div class="zr-priority">⚠️ PRIORITY</div>':''}
