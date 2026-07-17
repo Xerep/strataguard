@@ -1891,14 +1891,24 @@ async function checkForNewData() {
     // already being fetched, just never used. Now detects any real update,
     // not just a new calendar day.
     const latestTimestamp = data[0].run_timestamp;
+    // FIX (round 2): comparing the raw timestamp STRING is fragile — if
+    // Supabase's API serializes the identical underlying moment with even
+    // a slight formatting difference between two separate requests, a
+    // strict string comparison sees them as different every time, causing
+    // this to fire on every single 10-second poll forever instead of only
+    // on genuine new data. Confirmed live — reported as a notification
+    // that never stopped. Comparing actual numeric moments in time (epoch
+    // milliseconds) instead is immune to this, since it normalizes away
+    // any formatting variance in how the same instant gets serialized.
+    const latestTimeMs = new Date(latestTimestamp).getTime();
     if (!_lastDisplayedDate) {
       // First check — just record current state
-      _lastDisplayedDate = latestTimestamp;
+      _lastDisplayedDate = latestTimeMs;
       return;
     }
-    if (latestTimestamp !== _lastDisplayedDate) {
+    if (latestTimeMs !== _lastDisplayedDate) {
       // New data arrived — reload dashboard
-      _lastDisplayedDate = latestTimestamp;
+      _lastDisplayedDate = latestTimeMs;
       await loadLiveData(currentMPA.mpa_id);
       // Show green notification
       const notif = document.createElement('div');
