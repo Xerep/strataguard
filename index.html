@@ -1042,7 +1042,16 @@ async function loadLiveData(mpaId = 'cay_sal_bank') {
     buildLiveZones(r);
     updateProvenance(r);
     if (window._map) updateMapMarkers();
-    _lastDisplayedDate = r.run_date; // track what's currently displayed for auto-refresh
+    // FIX (round 4, real root cause): this line was silently overwriting
+    // the numeric epoch timestamp that checkForNewData() maintains (as of
+    // round 3's fix) with a plain date STRING instead — two different
+    // functions writing to the same shared variable with incompatible
+    // value types. Comparing a number to a string with !== is always true
+    // in JavaScript, guaranteeing every poll after the first real reload
+    // looked like new data forever, which reloaded, which overwrote the
+    // variable again — an endless loop. checkForNewData() already fully
+    // owns and correctly manages this variable on its own; this second,
+    // conflicting write is removed entirely.
 
   } catch(err) {
     console.error('Data load error:', err);
