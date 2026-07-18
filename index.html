@@ -1467,10 +1467,14 @@ function buildLiveZones(r) {
         const _rt = realOrFallback('Rain & Thunderstorm', 'D', Math.round(Math.min(99,(r.precip_prob_max_pct||0)/70*80)));
         const _mv = realOrFallback('Marine Visibility', 'E', visScore);
         const _wh = realOrFallback('Wave Height', 'D', waveScore);
-        const _tidW = realOrFallback('Tidal Window', 'M', 35);
+        // FIX: confirmed via real live data these two names didn't exactly
+        // match what the backend actually saves — silently, safely falling
+        // back to old values instead of crashing, but not using the real
+        // fix either. Corrected to match the real, confirmed field names.
+        const _tidW = realOrFallback('Tidal Window (Atoll)', 'M', 35);
         const _oc = realOrFallback('Ocean Current', cType, cScore);
         const _sst = realOrFallback('Sea Surface Temp', 'E', sstScore);
-        const _nwc = realOrFallback('Night Wind Calm', 'E', nightWindScore);
+        const _nwc = realOrFallback('Night Wind Calm Window', 'E', nightWindScore);
         const _cc = realOrFallback('Cloud Cover', 'E', cloudScore);
         const _pt = realOrFallback('Pressure Trend (24h Δ)', 'M', ptScore);
         const _mi = realOrFallback('Moon Illumination', 'E', moonScore);
