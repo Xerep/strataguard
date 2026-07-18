@@ -1900,7 +1900,22 @@ async function checkForNewData() {
     // that never stopped. Comparing actual numeric moments in time (epoch
     // milliseconds) instead is immune to this, since it normalizes away
     // any formatting variance in how the same instant gets serialized.
-    const latestTimeMs = new Date(latestTimestamp).getTime();
+    // FIX (round 3): the previous fix used new Date(latestTimestamp)
+    // directly, but Supabase/Postgres timestamps come back space-separated
+    // ("2026-07-17 18:47:38.953+00"), not the "T"-separated ISO format
+    // JavaScript's Date parser reliably handles. An unreliable parse
+    // silently returns NaN — and NaN is never equal to itself in
+    // JavaScript, meaning the comparison below would evaluate as
+    // "different" on every single check, forever, regardless of the real
+    // values. This is a much stronger explanation for a notification that
+    // fires every few seconds than the first fix addressed. Normalizing
+    // the string to real ISO format before parsing fixes this reliably.
+    const _normalizedTs = String(latestTimestamp).replace(' ', 'T').replace(/\+00$/, 'Z');
+    const latestTimeMs = new Date(_normalizedTs).getTime();
+    // Safety net: if parsing still somehow fails despite normalization,
+    // skip this check entirely rather than risk repeating the same bug
+    // through a different edge case — NaN comparisons are never reliable.
+    if (isNaN(latestTimeMs)) return;
     if (!_lastDisplayedDate) {
       // First check — just record current state
       _lastDisplayedDate = latestTimeMs;
