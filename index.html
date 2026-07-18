@@ -1443,10 +1443,22 @@ function buildLiveZones(r) {
       const _raw = JSON.parse(r['factors_'+zid] || '[]');
       _raw.forEach(f => { _realFactors[f.n] = {type: f.t, score: f.s}; });
     } catch(e) {}
-    function realOrFallback(name, fallbackType, fallbackScore) {
-      const real = _realFactors[name];
-      return real ? {type: real.type, score: real.score, isReal: true}
-                  : {type: fallbackType, score: fallbackScore, isReal: false};
+    // FIX: confirmed via real Andros data — the backend itself has a real,
+    // pre-existing naming inconsistency for this factor across zones
+    // (Andros/Cay Sal genuinely save it as "Tidal Window"; Diamond Point/
+    // Exuma/Inagua/Jumentos save it as "Tidal Window (Atoll)"). A single
+    // hardcoded lookup name would silently work for some zones and
+    // silently fall back for others. Now accepts multiple possible real
+    // names and uses whichever one actually exists in this zone's data.
+    function realOrFallback(names, fallbackType, fallbackScore) {
+      const nameList = Array.isArray(names) ? names : [names];
+      for (const n of nameList) {
+        if (_realFactors[n]) {
+          const real = _realFactors[n];
+          return {type: real.type, score: real.score, isReal: true};
+        }
+      }
+      return {type: fallbackType, score: fallbackScore, isReal: false};
     }
 
     return {
@@ -1471,7 +1483,7 @@ function buildLiveZones(r) {
         // match what the backend actually saves — silently, safely falling
         // back to old values instead of crashing, but not using the real
         // fix either. Corrected to match the real, confirmed field names.
-        const _tidW = realOrFallback('Tidal Window (Atoll)', 'M', 35);
+        const _tidW = realOrFallback(['Tidal Window (Atoll)', 'Tidal Window'], 'M', 35);
         const _oc = realOrFallback('Ocean Current', cType, cScore);
         const _sst = realOrFallback('Sea Surface Temp', 'E', sstScore);
         const _nwc = realOrFallback('Night Wind Calm Window', 'E', nightWindScore);
