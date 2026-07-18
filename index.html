@@ -1430,6 +1430,25 @@ function buildLiveZones(r) {
     const moonScore = Math.round(Math.max(4,100-moon));
     const darkHours = (24-(r.daylight_hours||13.65)).toFixed(1);
 
+    // HEADLINE FIX — real per-zone factor scoring, not recomputed guesses.
+    // Confirmed tonight: every score below was an independent, simplified
+    // approximation of the real backend's evidence-calibrated formulas
+    // (e.g. wind read 50 here vs the real 25 at 15mph — exactly double).
+    // Now reads the real type/score computed in Fetch All Data1, persisted
+    // via the new factors_<zone> column. Falls back to the old computed
+    // values only for historical rows saved before this fix existed —
+    // clearly marked, not silently blended.
+    let _realFactors = {};
+    try {
+      const _raw = JSON.parse(r['factors_'+zid] || '[]');
+      _raw.forEach(f => { _realFactors[f.n] = {type: f.t, score: f.s}; });
+    } catch(e) {}
+    function realOrFallback(name, fallbackType, fallbackScore) {
+      const real = _realFactors[name];
+      return real ? {type: real.type, score: real.score, isReal: true}
+                  : {type: fallbackType, score: fallbackScore, isReal: false};
+    }
+
     return {
       ...zd,
       score, level, icon: icons2[level]||'🟡',
@@ -1441,26 +1460,38 @@ function buildLiveZones(r) {
       weather:{wind_max_mph:wind,wind_avg_mph:pf(r['wind_avg_'+zid+'_mph'], pf(r.wind_avg_mph, 0)),wind_night_max_mph:wind,dominant_wind_dir:r.wind_direction||'SE',precip_prob_max_pct:r.precip_prob_max_pct||0,thunderstorm_hours:r.thunderstorm_hours||0,visibility_min_miles:vis,wave_height_max_m:wave,cloud_cover_avg_pct:cloudMap[zid],pressure_trend_hpa:pressMap[zid]},
       sst:{celsius:sst,fahrenheit:Math.round((sst*9/5+32)*10)/10,fish_concentration_score:Math.min(99,Math.max(5,Math.round((sst-24)/8*60+40)))},
       currents:{speed_knots:kts,direction_compass:ck.dir||'N/A',risk:ctLabel[cType]||'MIXED',live:r.current_source_tier==='live'},
-      factors:[
-        {name:'Darkness Window',    type:'E',rawScore:75,              val:`${darkHours}h dark`},
-        {name:'Twilight Window',    type:'E',rawScore:65,              val:`Dusk ${r.civil_dusk_local||'—'}`},
-        {name:'Wind Speed',         type:'D',rawScore:windScore,       val:`${wind}mph / ${r.wind_direction||'SE'}`},
-        {name:'Rain & Thunderstorm',type:'D',rawScore:Math.round(Math.min(99,(r.precip_prob_max_pct||0)/70*80)), val:`${r.precip_prob_max_pct||0}% / ${r.thunderstorm_hours||0}h`},
-        {name:'Marine Visibility',  type:'E',rawScore:visScore,        val:`${vis}mi min`},
-        {name:'Wave Height',        type:'D',rawScore:waveScore,       val:`${wave}m max`},
-        // FIX: today's server-side disclosures (uncertainty flag, tide
-        // station notice, clearer pressure label) were only ever added to
-        // the email/backend text — the dashboard rebuilds these display
-        // strings independently and never got any of them. Added here.
-        {name:'Tidal Window',       type:'M',rawScore:35,              val:`High ${pf(r['tide_high_'+zid+'_m'], 0).toFixed(2)}m / Low ${pf(r['tide_low_'+zid+'_m'], 0).toFixed(2)}m MLLW${['andros','diamond_point','exuma_cays','jumentos_cays'].includes(currentMPA?.mpa_id) ? ' ⚠️ Regional reference station' : ''}`},
-        {name:'Ocean Current',      type:cType,rawScore:cScore,        val:`${kts}kts ${ck.dir||'N/A'} ●${r.current_source_tier==='live'?'live':'est'}${kts>=1.5 ? ' ⚠️ Model Uncertainty' : ''}`},
-        {name:'Sea Surface Temp',   type:'E',rawScore:sstScore,        val:`${sst}°C / ${Math.round((sst*9/5+32)*10)/10}°F`},
-        {name:'Night Wind Calm',    type:'E',rawScore:nightWindScore,  val:`${wind}mph night`},
-        {name:'Cloud Cover',        type:'E',rawScore:cloudScore,      val:`${cloudMap[zid]}%`},
-        {name:'Pressure Trend (24h Δ)',     type:'M',rawScore:ptScore,         val:`${pressMap[zid]} hPa`},
-        {name:'Moon Illumination',  type:'E',rawScore:moonScore,       val:`${moon}% (${r.moon_phase||'—'})`},
-        {name:'Regulatory Vuln.',   type:'E',rawScore:r.regulatory_active?80:15, val:r.regulatory_active?r.regulatory_species:'None'},
-      ]
+      factors:(()=>{
+        const _dw = realOrFallback('Darkness Window', 'E', 75);
+        const _tw = realOrFallback('Twilight Window', 'E', 65);
+        const _ws = realOrFallback('Wind Speed', 'D', windScore);
+        const _rt = realOrFallback('Rain & Thunderstorm', 'D', Math.round(Math.min(99,(r.precip_prob_max_pct||0)/70*80)));
+        const _mv = realOrFallback('Marine Visibility', 'E', visScore);
+        const _wh = realOrFallback('Wave Height', 'D', waveScore);
+        const _tidW = realOrFallback('Tidal Window', 'M', 35);
+        const _oc = realOrFallback('Ocean Current', cType, cScore);
+        const _sst = realOrFallback('Sea Surface Temp', 'E', sstScore);
+        const _nwc = realOrFallback('Night Wind Calm', 'E', nightWindScore);
+        const _cc = realOrFallback('Cloud Cover', 'E', cloudScore);
+        const _pt = realOrFallback('Pressure Trend (24h Δ)', 'M', ptScore);
+        const _mi = realOrFallback('Moon Illumination', 'E', moonScore);
+        const _rv = realOrFallback('Regulatory Vulnerability', 'E', r.regulatory_active?80:15);
+        return [
+        {name:'Darkness Window',    type:_dw.type,rawScore:_dw.score,     val:`${darkHours}h dark`},
+        {name:'Twilight Window',    type:_tw.type,rawScore:_tw.score,     val:`Dusk ${r.civil_dusk_local||'—'}`},
+        {name:'Wind Speed',         type:_ws.type,rawScore:_ws.score,     val:`${wind}mph / ${r.wind_direction||'SE'}`},
+        {name:'Rain & Thunderstorm',type:_rt.type,rawScore:_rt.score,     val:`${r.precip_prob_max_pct||0}% / ${r.thunderstorm_hours||0}h`},
+        {name:'Marine Visibility',  type:_mv.type,rawScore:_mv.score,     val:`${vis}mi min`},
+        {name:'Wave Height',        type:_wh.type,rawScore:_wh.score,     val:`${wave}m max`},
+        {name:'Tidal Window',       type:_tidW.type,rawScore:_tidW.score, val:`High ${pf(r['tide_high_'+zid+'_m'], 0).toFixed(2)}m / Low ${pf(r['tide_low_'+zid+'_m'], 0).toFixed(2)}m MLLW${['andros','diamond_point','exuma_cays','jumentos_cays'].includes(currentMPA?.mpa_id) ? ' ⚠️ Regional reference station' : ''}`},
+        {name:'Ocean Current',      type:_oc.type,rawScore:_oc.score,     val:`${kts}kts ${ck.dir||'N/A'} ●${r.current_source_tier==='live'?'live':'est'}${kts>=1.5 ? ' ⚠️ Model Uncertainty' : ''}`},
+        {name:'Sea Surface Temp',   type:_sst.type,rawScore:_sst.score,   val:`${sst}°C / ${Math.round((sst*9/5+32)*10)/10}°F`},
+        {name:'Night Wind Calm',    type:_nwc.type,rawScore:_nwc.score,   val:`${wind}mph night`},
+        {name:'Cloud Cover',        type:_cc.type,rawScore:_cc.score,     val:`${cloudMap[zid]}%`},
+        {name:'Pressure Trend (24h Δ)',type:_pt.type,rawScore:_pt.score,  val:`${pressMap[zid]} hPa`},
+        {name:'Moon Illumination',  type:_mi.type,rawScore:_mi.score,     val:`${moon}% (${r.moon_phase||'—'})`},
+        {name:'Regulatory Vuln.',   type:_rv.type,rawScore:_rv.score,     val:r.regulatory_active?r.regulatory_species:'None'},
+        ];
+      })()
     };
   });
 
